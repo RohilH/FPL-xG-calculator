@@ -3,7 +3,7 @@ from flask_cors import CORS
 import requests
 from enum import Enum
 import os
-import unicodedata
+from helpers import normalize_name
 
 
 class Position(Enum):
@@ -39,6 +39,12 @@ FPL_API_URL = "https://fantasy.premierleague.com/api"
 
 def get_fpl_data():
     response = requests.get(f"{FPL_API_URL}/bootstrap-static/")
+    return response.json()
+
+
+def get_gameweek_data(gameweek):
+    """Get detailed stats for a specific gameweek"""
+    response = requests.get(f"{FPL_API_URL}/event/{gameweek}/live/")
     return response.json()
 
 
@@ -107,24 +113,14 @@ def squad():
 
 @app.route("/api/players", methods=["GET"])
 def get_players():
-    search_term = request.args.get("search", "").lower()
-    # Normalize search term to remove diacritics
-    search_term = "".join(
-        c
-        for c in unicodedata.normalize("NFD", search_term)
-        if unicodedata.category(c) != "Mn"
-    )
+    search_term = request.args.get("search", "")
+    search_term = normalize_name(search_term)
     fpl_data = get_fpl_data()
 
     players = []
     for player in fpl_data["elements"]:
-        player_name = f"{player['first_name']} {player['second_name']}".lower()
-        # Normalize player name to remove diacritics
-        normalized_name = "".join(
-            c
-            for c in unicodedata.normalize("NFD", player_name)
-            if unicodedata.category(c) != "Mn"
-        )
+        player_name = f"{player['first_name']} {player['second_name']}"
+        normalized_name = normalize_name(player_name)
         if search_term in normalized_name:
             players.append(
                 {
@@ -186,7 +182,6 @@ def get_player_stats(player_id):
         if not player:
             return jsonify({"error": "Player not found"}), 404
 
-        player_name = f"{player['first_name']} {player['second_name']}"
         team_name = fpl_data["teams"][player["team"] - 1]["name"]
         position = Position.from_element_type(player["element_type"])
 
@@ -321,6 +316,71 @@ def get_squad_stats():
             "total_xpts": round(total_xpts),
         }
     )
+
+
+@app.route("/api/gameweeks", methods=["GET"])
+def get_gameweeks():
+    """Get list of played gameweeks"""
+    fpl_data = get_fpl_data()
+    gameweeks = []
+
+    for gw in fpl_data["events"]:
+        if gw["finished"]:  # Only include finished gameweeks
+            gameweeks.append(
+                {
+                    "id": gw["id"],
+                    "name": f"Gameweek {gw['id']}",
+                    "average_points": gw["average_entry_score"],
+                    "highest_points": gw["highest_score"],
+                    "is_current": gw["is_current"],
+                }
+            )
+
+    return jsonify(gameweeks)
+
+
+@app.route("/api/player/<int:player_id>/gameweek/<int:gameweek>", methods=["GET"])
+def get_player_gameweek_stats(player_id, gameweek):
+    """Get player stats for a specific gameweek"""
+    try:
+        gw_data = get_gameweek_data(gameweek)
+        player_stats = next(
+            (p for p in gw_data["elements"] if p["id"] == player_id), None
+        )
+
+        if not player_stats:
+            return jsonify({"error": "Player not found"}), 404
+
+        fpl_data = get_fpl_data()
+        player = next((p for p in fpl_data["elements"] if p["id"] == player_id), None)
+        position = Position.from_element_type(player["element_type"])
+
+        stats = player_stats["stats"]
+
+        # Calculate expected points for the gameweek
+        xpts = 0
+        if "expected_goals" in stats:
+            xpts += float(stats["expected_goals"]) * position.goal_points
+        if "expected_assists" in stats:
+            xpts += float(stats["expected_assists"]) * 3
+        if stats["minutes"] >= 60 and stats["clean_sheets"]:
+            xpts += position.clean_sheet_points
+        if stats["minutes"] > 0:
+            xpts += 1 if stats["minutes"] < 60 else 2
+
+        return jsonify(
+            {
+                "points": stats["total_points"],
+                "minutes": stats["minutes"],
+                "goals": stats["goals_scored"],
+                "assists": stats["assists"],
+                "clean_sheets": stats["clean_sheets"],
+                "xPts": round(xpts, 2),
+            }
+        )
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 if __name__ == "__main__":
