@@ -1,5 +1,7 @@
 # FPL xPts Calculator
 
+This app was built ENTIRELY with Cursor's Composer AI. I wrote almost 0 lines of code.
+
 A web application that calculates expected FPL (Fantasy Premier League) points based on players' xG (Expected Goals) and xA (Expected Assists) statistics. The app provides two main features:
 
 1. **Player Search**: Search for any Premier League player to view their:
