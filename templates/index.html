@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FPL xG Calculator</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .search-container {
+            margin-bottom: 20px;
+        }
+        #searchInput {
+            padding: 8px;
+            width: 300px;
+            font-size: 16px;
+        }
+        #playerList {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            border: 1px solid #ddd;
+            max-height: 200px;
+            overflow-y: auto;
+            display: none;
+        }
+        #playerList li {
+            padding: 8px;
+            cursor: pointer;
+        }
+        #playerList li:hover {
+            background-color: #f0f0f0;
+        }
+        .stats-container {
+            display: none;
+            margin-top: 20px;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-top: 20px;
+        }
+        .stat-box {
+            border: 1px solid #ddd;
+            padding: 15px;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>FPL xG Calculator</h1>
+    
+    <div class="search-container">
+        <input type="text" id="searchInput" placeholder="Search for a player...">
+        <ul id="playerList"></ul>
+    </div>
+
+    <div id="statsContainer" class="stats-container">
+        <h2 id="playerName"></h2>
+        <p id="playerInfo"></p>
+        
+        <div class="stats-grid">
+            <div class="stat-box">
+                <h3>Actual Stats</h3>
+                <div id="actualStats"></div>
+            </div>
+            <div class="stat-box">
+                <h3>Expected Stats</h3>
+                <div id="expectedStats"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let debounceTimeout;
+        const searchInput = document.getElementById('searchInput');
+        const playerList = document.getElementById('playerList');
+        const statsContainer = document.getElementById('statsContainer');
+
+        searchInput.addEventListener('input', () => {
+            clearTimeout(debounceTimeout);
+            debounceTimeout = setTimeout(() => {
+                const searchTerm = searchInput.value.trim();
+                if (searchTerm.length >= 3) {
+                    fetchPlayers(searchTerm);
+                } else {
+                    playerList.style.display = 'none';
+                }
+            }, 300);
+        });
+
+        async function fetchPlayers(searchTerm) {
+            try {
+                const response = await fetch(`/api/players?search=${encodeURIComponent(searchTerm)}`);
+                const players = await response.json();
+                
+                playerList.innerHTML = '';
+                players.forEach(player => {
+                    const li = document.createElement('li');
+                    li.textContent = `${player.name} (${player.team})`;
+                    li.onclick = () => selectPlayer(player.id);
+                    playerList.appendChild(li);
+                });
+                
+                playerList.style.display = players.length ? 'block' : 'none';
+            } catch (error) {
+                console.error('Error fetching players:', error);
+            }
+        }
+
+        async function selectPlayer(playerId) {
+            try {
+                const response = await fetch(`/api/player/${playerId}`);
+                const playerData = await response.json();
+                
+                document.getElementById('playerName').textContent = playerData.name;
+                document.getElementById('playerInfo').textContent = 
+                    `${playerData.position} - ${playerData.team}`;
+                
+                const actualStats = document.getElementById('actualStats');
+                actualStats.innerHTML = `
+                    <p>Goals: ${playerData.actual_stats.goals}</p>
+                    <p>Assists: ${playerData.actual_stats.assists}</p>
+                    <p>Clean Sheets: ${playerData.actual_stats.clean_sheets}</p>
+                    <p>Minutes: ${playerData.actual_stats.minutes}</p>
+                    <p>FPL Points: ${playerData.actual_stats.points.total}</p>
+                `;
+                
+                playerList.style.display = 'none';
+                searchInput.value = playerData.name;
+                statsContainer.style.display = 'block';
+            } catch (error) {
+                console.error('Error fetching player stats:', error);
+            }
+        }
+    </script>
+</body>
+</html> 
