@@ -157,11 +157,12 @@
             border-bottom: 2px solid #00ff87;
             padding-bottom: 10px;
             font-size: 1.2em;
+            margin-bottom: 16px;
         }
         .stat-item {
             display: flex;
             justify-content: space-between;
-            margin: 12px 0;
+            margin: 8px 0;
             padding: 4px 0;
         }
         .stat-label {
@@ -194,6 +195,7 @@
     <div class="nav-bar">
         <a href="/" class="nav-link active">Player Search</a>
         <a href="/stats" class="nav-link">League Stats</a>
+        <a href="/squad" class="nav-link">Squad Builder</a>
     </div>
     <h1>FPL xPts Calculator</h1>
     
@@ -232,7 +234,9 @@
         searchInput.addEventListener('input', () => {
             clearTimeout(debounceTimeout);
             debounceTimeout = setTimeout(() => {
-                const searchTerm = searchInput.value.trim();
+                const searchTerm = searchInput.value.trim()
+                    .normalize('NFKD')
+                    .replace(/[\u0300-\u036f]/g, '');
                 if (searchTerm.length >= 3) {
                     fetchPlayers(searchTerm);
                 } else {
@@ -249,16 +253,18 @@
                 playerList.innerHTML = '';
                 players.forEach(player => {
                     const li = document.createElement('li');
+                    const playerName = `${player.first_name} ${player.second_name}`;
                     li.innerHTML = `
-                        <img class="player-photo" src="https://resources.premierleague.com/premierleague/photos/players/110x140/p${player.photo}.png" 
+                        <img class="player-photo" 
+                             src="https://resources.premierleague.com/premierleague/photos/players/110x140/p${player.photo}.png"
                              onerror="this.src='https://resources.premierleague.com/premierleague/photos/players/110x140/Photo-Missing.png'"
-                             alt="${player.name}">
+                             alt="${playerName}">
                         <div class="player-info">
-                            <div class="player-name">${player.name}</div>
+                            <div class="player-name">${playerName}</div>
                             <div class="player-team">${player.team}</div>
                         </div>
                     `;
-                    li.onclick = () => selectPlayer(player.id, player.photo);
+                    li.onclick = () => selectPlayer(player.id);
                     playerList.appendChild(li);
                 });
                 
@@ -277,16 +283,17 @@
             `;
         }
 
-        async function selectPlayer(playerId, photoId) {
+        async function selectPlayer(playerId) {
             try {
                 const response = await fetch(`/api/player/${playerId}`);
                 const playerData = await response.json();
+                const playerName = `${playerData.first_name} ${playerData.second_name}`;
                 
-                document.getElementById('playerName').textContent = playerData.name;
+                document.getElementById('playerName').textContent = playerName;
                 document.getElementById('playerInfo').textContent = 
                     `${playerData.position} - ${playerData.team}`;
                 document.getElementById('playerPhoto').src = 
-                    `https://resources.premierleague.com/premierleague/photos/players/110x140/p${photoId}.png`;
+                    `https://resources.premierleague.com/premierleague/photos/players/110x140/p${playerData.photo}.png`;
                 
                 const actualStats = document.getElementById('actualStats');
                 actualStats.innerHTML = `
@@ -326,7 +333,7 @@
                 `;
                 
                 playerList.style.display = 'none';
-                searchInput.value = playerData.name;
+                searchInput.value = playerName;
                 statsContainer.style.display = 'block';
             } catch (error) {
                 console.error('Error fetching player stats:', error);

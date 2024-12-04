@@ -124,6 +124,7 @@
     <div class="nav-bar">
         <a href="/" class="nav-link">Player Search</a>
         <a href="/stats" class="nav-link active">League Stats</a>
+        <a href="/squad" class="nav-link">Squad Builder</a>
     </div>
     <h1>FPL Statistics</h1>
     
@@ -203,9 +204,9 @@
                         <img class="player-photo" 
                              src="https://resources.premierleague.com/premierleague/photos/players/110x140/p${player.photo}.png"
                              onerror="this.src='https://resources.premierleague.com/premierleague/photos/players/110x140/Photo-Missing.png'"
-                             alt="${player.name}">
+                             alt="${player.first_name} ${player.second_name}">
                         <div>
-                            <div class="player-name">${player.name}</div>
+                            <div class="player-name">${player.first_name} ${player.second_name}</div>
                             <div class="player-team">
                                 ${player.team}
                                 <span class="position-tag ${player.position}">${player.position}</span>

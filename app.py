@@ -3,6 +3,7 @@ from flask_cors import CORS
 import requests
 from enum import Enum
 import os
+import unicodedata
 
 
 class Position(Enum):
@@ -99,19 +100,37 @@ def stats():
     return send_from_directory(".", "stats.html")
 
 
+@app.route("/squad")
+def squad():
+    return send_from_directory(".", "squad.html")
+
+
 @app.route("/api/players", methods=["GET"])
 def get_players():
     search_term = request.args.get("search", "").lower()
+    # Normalize search term to remove diacritics
+    search_term = "".join(
+        c
+        for c in unicodedata.normalize("NFD", search_term)
+        if unicodedata.category(c) != "Mn"
+    )
     fpl_data = get_fpl_data()
 
     players = []
     for player in fpl_data["elements"]:
         player_name = f"{player['first_name']} {player['second_name']}".lower()
-        if search_term in player_name:
+        # Normalize player name to remove diacritics
+        normalized_name = "".join(
+            c
+            for c in unicodedata.normalize("NFD", player_name)
+            if unicodedata.category(c) != "Mn"
+        )
+        if search_term in normalized_name:
             players.append(
                 {
                     "id": player["id"],
-                    "name": f"{player['first_name']} {player['second_name']}",
+                    "first_name": player["first_name"],
+                    "second_name": player["second_name"],
                     "team": fpl_data["teams"][player["team"] - 1]["name"],
                     "photo": player["code"],
                 }
@@ -132,7 +151,8 @@ def get_stats():
         players.append(
             {
                 "id": player["id"],
-                "name": f"{player['first_name']} {player['second_name']}",
+                "first_name": player["first_name"],
+                "second_name": player["second_name"],
                 "team": fpl_data["teams"][player["team"] - 1]["name"],
                 "position": position.name,
                 "photo": player["code"],
@@ -230,9 +250,11 @@ def get_player_stats(player_id):
         }
 
         response_data = {
-            "name": player_name,
+            "first_name": player["first_name"],
+            "second_name": player["second_name"],
             "team": team_name,
             "position": position.name,
+            "photo": player["code"],
             "actual_stats": {
                 "goals": player["goals_scored"],
                 "assists": player["assists"],
@@ -254,6 +276,51 @@ def get_player_stats(player_id):
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/squad-stats", methods=["POST"])
+def get_squad_stats():
+    """Calculate total points and xPts for a given squad"""
+    player_ids = request.json.get("player_ids", [])
+    fpl_data = get_fpl_data()
+
+    total_points = 0
+    total_xpts = 0
+    squad_info = []
+
+    for player_id in player_ids:
+        player = next((p for p in fpl_data["elements"] if p["id"] == player_id), None)
+        if player:
+            position = Position.from_element_type(player["element_type"])
+            xpts = calculate_player_xpts(player, position)
+
+            squad_info.append(
+                {
+                    "id": player["id"],
+                    "first_name": player["first_name"],
+                    "second_name": player["second_name"],
+                    "team": fpl_data["teams"][player["team"] - 1]["name"],
+                    "position": position.name,
+                    "photo": player["code"],
+                    "points": player["total_points"],
+                    "minutes": player["minutes"],
+                    "ppg": round(player["total_points"] / (player["minutes"] / 90), 2)
+                    if player["minutes"] > 0
+                    else 0,
+                    "xPts": xpts,
+                }
+            )
+
+            total_points += player["total_points"]
+            total_xpts += xpts
+
+    return jsonify(
+        {
+            "squad": squad_info,
+            "total_points": total_points,
+            "total_xpts": round(total_xpts),
+        }
+    )
 
 
 if __name__ == "__main__":
