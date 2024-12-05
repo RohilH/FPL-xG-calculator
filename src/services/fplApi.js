@@ -1,5 +1,4 @@
 import { Position } from '../enums';
-import { getPlayerSeasonStats } from './playerStats';
 
 let cachedFplData = null;
 
@@ -34,7 +33,6 @@ export const searchPlayers = async (searchTerm) => {
     })
     .map(player => {
       const position = Position.fromElementType(player.element_type);
-      const stats = getPlayerSeasonStats(player, position);
       
       return {
         id: player.id,
@@ -44,12 +42,6 @@ export const searchPlayers = async (searchTerm) => {
         team: fplData.teams[player.team - 1].name,
         photo: `https://resources.premierleague.com/premierleague/photos/players/110x140/p${player.code}.png`,
         position,
-        stats: {
-          ...stats.actual,
-          xG: stats.expected.goals,
-          xA: stats.expected.assists,
-          xPts: stats.expected.points,
-        }
       };
     });
 } 

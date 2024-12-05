@@ -52,7 +52,7 @@ function App() {
 
         <Routes>
           <Route path="/" element={<PlayerSearch fplData={fplData} />} />
-          <Route path="/stats" element={<LeagueStats />} />
+          <Route path="/stats" element={<LeagueStats fplData={fplData} />} />
           <Route path="/squad" element={<SquadBuilder />} />
         </Routes>
       </div>

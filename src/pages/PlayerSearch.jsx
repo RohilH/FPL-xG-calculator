@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { normalizeString } from '../services/fplApi';
+import { formatPlayerData } from '../services/playerHelpers';
 import { formatPlayerStats } from '../services/statsHelper';
 import { Position } from '../enums';
 
@@ -32,27 +33,7 @@ function PlayerSearch({ fplData }) {
         const playerName = `${player.first_name} ${player.second_name}`;
         return normalizeString(playerName).includes(normalizedSearch);
       })
-      .map(player => ({
-        id: player.id,
-        first_name: player.first_name,
-        second_name: player.second_name,
-        name: `${player.first_name} ${player.second_name}`,
-        team: fplData.teams[player.team - 1].name,
-        photo: `https://resources.premierleague.com/premierleague/photos/players/110x140/p${player.code}.png`,
-        position: Position.fromElementType(player.element_type),
-        stats: {
-          points: player.total_points,
-          minutes: player.minutes,
-          goals: player.goals_scored,
-          assists: player.assists,
-          cleanSheets: player.clean_sheets,
-          xG: parseFloat(player.expected_goals || 0),
-          xA: parseFloat(player.expected_assists || 0),
-          form: parseFloat(player.form),
-          selectedBy: parseFloat(player.selected_by_percent),
-          cost: player.now_cost / 10,
-        }
-      }));
+      .map(player => formatPlayerData(player, fplData));
 
     setPlayers(results);
   };
