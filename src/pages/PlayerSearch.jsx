@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
-import { normalizeString } from '../services/fplApi';
-import { formatPlayerData } from '../services/playerHelpers';
-import { formatPlayerStats } from '../services/statsHelper';
-import { Position } from '../enums';
+import React, { useState, useEffect } from "react";
+import { normalizeString } from "../services/fplApi";
+import { formatPlayerData } from "../services/playerHelpers";
+import { formatPlayerStats } from "../services/statsHelper";
+import { Position } from "../enums";
 
 function PlayerSearch({ fplData }) {
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState("");
   const [players, setPlayers] = useState([]);
   const [selectedPlayer, setSelectedPlayer] = useState(null);
   const [stats, setStats] = useState(null);
@@ -13,7 +13,10 @@ function PlayerSearch({ fplData }) {
 
   useEffect(() => {
     const debounceTimeout = setTimeout(() => {
-      if (searchTerm.length >= 3 && (!selectedPlayer || searchTerm !== selectedPlayer.name)) {
+      if (
+        searchTerm.length >= 3 &&
+        (!selectedPlayer || searchTerm !== selectedPlayer.name)
+      ) {
         searchPlayers();
         setShowDropdown(true);
       } else {
@@ -27,13 +30,13 @@ function PlayerSearch({ fplData }) {
 
   const searchPlayers = () => {
     const normalizedSearch = normalizeString(searchTerm);
-    
+
     const results = fplData.elements
-      .filter(player => {
+      .filter((player) => {
         const playerName = `${player.first_name} ${player.second_name}`;
         return normalizeString(playerName).includes(normalizedSearch);
       })
-      .map(player => formatPlayerData(player, fplData));
+      .map((player) => formatPlayerData(player, fplData));
 
     setPlayers(results);
   };
@@ -57,28 +60,39 @@ function PlayerSearch({ fplData }) {
 
   const formatStatLabel = (key) => {
     const specialCases = {
-      'raw_xg': 'xG',
-      'raw_xa': 'xA',
-      'expected_goals': 'Expected Goals (rounded)',
-      'expected_assists': 'Expected Assists (rounded)'
+      raw_xg: "xG",
+      raw_xa: "xA",
+      expected_goals: "Expected Goals (rounded)",
+      expected_assists: "Expected Assists (rounded)",
     };
-    
-    return specialCases[key] || 
-      key.split('_')
-         .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-         .join(' ');
+
+    return (
+      specialCases[key] ||
+      key
+        .split("_")
+        .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(" ")
+    );
   };
 
   const orderActualStats = (stats) => {
-    const order = ['goals', 'assists', 'clean_sheets', 'minutes'];
-    return Object.entries(stats)
-      .sort(([keyA], [keyB]) => order.indexOf(keyA) - order.indexOf(keyB));
+    const order = ["goals", "assists", "clean_sheets", "minutes"];
+    return Object.entries(stats).sort(
+      ([keyA], [keyB]) => order.indexOf(keyA) - order.indexOf(keyB)
+    );
   };
 
   const orderExpectedStats = (stats) => {
-    const order = ['raw_xg', 'raw_xa', 'expected_goals', 'expected_assists', 'clean_sheets'];
-    return Object.entries(stats)
-      .sort(([keyA], [keyB]) => order.indexOf(keyA) - order.indexOf(keyB));
+    const order = [
+      "raw_xg",
+      "raw_xa",
+      "expected_goals",
+      "expected_assists",
+      "clean_sheets",
+    ];
+    return Object.entries(stats).sort(
+      ([keyA], [keyB]) => order.indexOf(keyA) - order.indexOf(keyB)
+    );
   };
 
   return (
@@ -96,12 +110,13 @@ function PlayerSearch({ fplData }) {
           <ul className="player-list">
             {players.map((player) => (
               <li key={player.id} onClick={() => handlePlayerSelect(player)}>
-                <img 
-                  src={player.photo} 
+                <img
+                  src={player.photo}
                   alt={player.name}
                   className="player-photo"
                   onError={(e) => {
-                    e.target.src = 'https://resources.premierleague.com/premierleague/photos/players/110x140/Photo-Missing.png';
+                    e.target.src =
+                      "https://resources.premierleague.com/premierleague/photos/players/110x140/Photo-Missing.png";
                   }}
                 />
                 <div className="player-info">
@@ -117,11 +132,12 @@ function PlayerSearch({ fplData }) {
       {selectedPlayer && stats && (
         <div className="stats-container">
           <div className="stats-header">
-            <img 
-              src={selectedPlayer.photo} 
+            <img
+              src={selectedPlayer.photo}
               alt={selectedPlayer.name}
               onError={(e) => {
-                e.target.src = 'https://resources.premierleague.com/premierleague/photos/players/110x140/Photo-Missing.png';
+                e.target.src =
+                  "https://resources.premierleague.com/premierleague/photos/players/110x140/Photo-Missing.png";
               }}
             />
             <div className="stats-header-info">
@@ -129,7 +145,7 @@ function PlayerSearch({ fplData }) {
               <p>{selectedPlayer.team}</p>
             </div>
           </div>
-          
+
           <div className="stats-grid">
             <div className="stat-box">
               <h3>Actual Stats</h3>
@@ -143,15 +159,21 @@ function PlayerSearch({ fplData }) {
                 <div className="total-points">
                   <div className="stat-item">
                     <span className="stat-label">Total Points</span>
-                    <span className="stat-value">{stats.actual.points.total}</span>
+                    <span className="stat-value">
+                      {stats.actual.points.total}
+                    </span>
                   </div>
                   <div className="points-breakdown">
                     <small>Goals: {stats.actual.points.goals}</small>
                     <small>Assists: {stats.actual.points.assists}</small>
-                    <small>Clean Sheets: {stats.actual.points.clean_sheets}</small>
+                    <small>
+                      Clean Sheets: {stats.actual.points.clean_sheets}
+                    </small>
                     <small className="tooltip-container">
                       Other: {stats.actual.points.other}
-                      <span className="tooltip">Includes appearances, bonus points, and deductions</span>
+                      <span className="tooltip">
+                        Includes appearances, bonus points, and deductions
+                      </span>
                     </small>
                   </div>
                 </div>
@@ -160,26 +182,36 @@ function PlayerSearch({ fplData }) {
             <div className="stat-box">
               <h3>Expected Stats</h3>
               <div>
-                {orderExpectedStats(stats.expected.stats).map(([key, value]) => (
-                  <div key={key} className="stat-item">
-                    <span className="stat-label">{formatStatLabel(key)}</span>
-                    <span className="stat-value">
-                      {typeof value === 'number' && !Number.isInteger(value) ? value.toFixed(2) : value}
-                    </span>
-                  </div>
-                ))}
+                {orderExpectedStats(stats.expected.stats).map(
+                  ([key, value]) => (
+                    <div key={key} className="stat-item">
+                      <span className="stat-label">{formatStatLabel(key)}</span>
+                      <span className="stat-value">
+                        {typeof value === "number" && !Number.isInteger(value)
+                          ? value.toFixed(2)
+                          : value}
+                      </span>
+                    </div>
+                  )
+                )}
                 <div className="total-points">
                   <div className="stat-item">
                     <span className="stat-label">Expected Points</span>
-                    <span className="stat-value">{stats.expected.points.total}</span>
+                    <span className="stat-value">
+                      {stats.expected.points.total}
+                    </span>
                   </div>
                   <div className="points-breakdown">
                     <small>Goals: {stats.expected.points.goals}</small>
                     <small>Assists: {stats.expected.points.assists}</small>
-                    <small>Clean Sheets: {stats.expected.points.clean_sheets}</small>
+                    <small>
+                      Clean Sheets: {stats.expected.points.clean_sheets}
+                    </small>
                     <small className="tooltip-container">
                       Other: {stats.expected.points.other}
-                      <span className="tooltip">Includes appearances, bonus points, and deductions</span>
+                      <span className="tooltip">
+                        Includes appearances, bonus points, and deductions
+                      </span>
                     </small>
                   </div>
                 </div>
@@ -235,4 +267,4 @@ function PlayerSearch({ fplData }) {
   );
 }
 
-export default PlayerSearch; 
+export default PlayerSearch;
