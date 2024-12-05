@@ -1,63 +1,135 @@
-# FPL xPts Calculator
+# FPL Expected Points Calculator
 
+A web application that helps Fantasy Premier League (FPL) managers analyze player performance and build optimal squads based on expected points.
 This app was built ENTIRELY with Cursor's Composer AI. I wrote almost 0 lines of code.
-
-A web application that calculates expected FPL (Fantasy Premier League) points based on players' xG (Expected Goals) and xA (Expected Assists) statistics. The app provides two main features:
-
-1. **Player Search**: Search for any Premier League player to view their:
-   - Actual stats (goals, assists, clean sheets)
-   - Expected stats (xG, xA)
-   - Points breakdown
-   - Expected points calculation
-
-2. **League Stats**: View all Premier League players in a sortable table with:
-   - Current FPL stats
-   - Expected stats
-   - Filtering by position
-   - Sorting by any metric (points, xPts, goals, etc.)
-
-## Setup Instructions
-
-1. Clone the repository:
-```bash
-git clone https://github.com/RohilH/FPL-xG-calculator.git
-cd FPL-xG-calculator
-```
-
-2. Create and activate a virtual environment (optional but recommended):
-```bash
-python -m venv venv
-source venv/bin/activate  # On Windows use: venv\Scripts\activate
-```
-
-3. Install dependencies:
-```bash
-pip install -r requirements.txt
-```
-
-4. Run the application:
-```bash
-python app.py
-```
-
-5. Open your browser and navigate to:
-```
-http://localhost:5000
-```
 
 ## Features
 
-- Real-time FPL data integration
-- Expected points calculation based on xG and xA
-- Clean sheet and appearance points consideration
-- Position-based point multipliers
-- Sortable league table
-- Player photo integration
-- Mobile-responsive design
+### Squad Builder
+- Interactive pitch visualization for building your squad
+- Position-specific player slots with validation rules:
+  - Exactly 1 goalkeeper
+  - At least 3 defenders
+  - At least 1 forward
+  - Maximum 5 defenders/midfielders
+  - Maximum 3 forwards
+- Real-time squad statistics
+- Player search with position filtering
+- Player cards showing:
+  - Current points
+  - Expected points
+  - Team information
+  - Player photo
+- Reset squad functionality
 
-## Technologies Used
+### League Stats
+- Complete overview of all Premier League players
+- Sortable columns for:
+  - Total points
+  - Expected points (xPts)
+  - Form
+  - Selection percentage
+  - Cost
+- Team filtering
+- Position filtering
 
-- Python/Flask for backend
-- HTML/CSS/JavaScript for frontend
-- FPL API integration
-- Real-time data updates 
+### Player Search
+- Fast, responsive search functionality
+- Support for special characters and accents
+- Displays player photos and team information
+- Caches results for improved performance
+
+## Technical Improvements
+
+### Frontend
+- React-based SPA with React Router
+- Modular component structure
+- Responsive design
+- Improved styling with consistent UI elements
+- Performance optimizations:
+  - Player data caching
+  - Efficient state management
+  - Optimized rendering
+
+### Backend
+- Flask API with CORS support
+- Efficient data fetching from FPL API
+- Player name normalization for better search
+- Expected points calculation based on:
+  - Goals and assists
+  - Clean sheets
+  - Appearance points
+  - Bonus points
+- Modular code structure with separate modules for:
+  - Position enums
+  - Helper functions
+  - API routes
+
+## Setup
+
+1. Clone the repository:
+```bash
+git clone https://github.com/yourusername/fpl-xpts-calculator.git
+cd fpl-xpts-calculator
+```
+
+2. Install dependencies:
+```bash
+# Install Python dependencies
+pip install -r requirements.txt
+
+# Install Node.js dependencies
+npm install
+```
+
+3. Build and run:
+```bash
+# Build frontend
+npm run build
+
+# Start server
+gunicorn wsgi:app
+```
+
+## Development
+
+For development, you can run:
+
+```bash
+# Run frontend dev server
+npm run dev
+
+# Run backend dev server
+python app.py
+```
+
+## Dependencies
+
+### Frontend
+- React 18
+- React Router 6
+- Vite
+
+### Backend
+- Flask 3.0.0
+- Flask-CORS 4.0.0
+- Requests 2.31.0
+- Python-dotenv 1.0.0
+- Gunicorn 21.2.0
+- Werkzeug 3.0.1
+
+## Deployment
+
+The application is configured for deployment on Heroku:
+1. Set up a new Heroku app
+2. Connect your repository
+3. Deploy the main branch
+
+The build process will automatically:
+1. Install dependencies
+2. Build the React frontend
+3. Start the Gunicorn server
+
+## Contributing
+
+Feel free to submit issues and enhancement requests!
