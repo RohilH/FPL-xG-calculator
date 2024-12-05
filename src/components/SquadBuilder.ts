@@ -4,6 +4,8 @@ import { SquadManager } from '../managers/SquadManager.js';
 export class SquadBuilder {
     private container: HTMLElement;
     private squadManager!: SquadManager;
+    private searchModal: HTMLElement | null = null;
+    private currentSlot: HTMLElement | null = null;
 
     constructor(container: HTMLElement) {
         this.container = container;
@@ -17,177 +19,246 @@ export class SquadBuilder {
 
     private async render(): Promise<void> {
         this.container.innerHTML = `
-            <div class="container">
-                <div class="main-content">
-                    <div class="pitch">
-                        <div class="row">
+            <h1>Squad Builder</h1>
+            <div class="container-sb">
+                <div class="pitch-container-sb">
+                    <div class="pitch-sb">
+                        <div class="row-sb">
                             ${this.createPlayerSlots(1, 'GK')}
                         </div>
-                        <div class="row">
-                            ${this.createPlayerSlots(4, 'DEF')}
+                        <div class="row-sb">
+                            ${this.createPlayerSlots(5, 'DEF')}
                         </div>
-                        <div class="row">
-                            ${this.createPlayerSlots(4, 'MID')}
+                        <div class="row-sb">
+                            ${this.createPlayerSlots(5, 'MID')}
                         </div>
-                        <div class="row">
-                            ${this.createPlayerSlots(2, 'FWD')}
+                        <div class="row-sb">
+                            ${this.createPlayerSlots(3, 'FWD')}
                         </div>
                     </div>
                 </div>
-                <div class="sidebar">
-                    <div class="stats-container">
-                        <div class="stats-header">Squad Stats</div>
-                        <div class="stats-row">
-                            <span class="stats-label">Total Points</span>
-                            <span class="stats-value" id="total-points">0</span>
+                <div class="stats-container-sb">
+                    <div class="stats-box-sb">
+                        <h3>Squad Stats</h3>
+                        <div class="stat-item-sb">
+                            <span class="stat-label-sb">Total Points:</span>
+                            <span class="stat-value-sb" id="total-points">0</span>
                         </div>
-                        <div class="stats-row">
-                            <span class="stats-label">Expected Points</span>
-                            <span class="stats-value" id="total-xpts">0</span>
-                        </div>
-                        <div class="stats-row">
-                            <span class="stats-label">Average PPG</span>
-                            <span class="stats-value" id="avg-ppg">0</span>
+                        <div class="stat-item-sb">
+                            <span class="stat-label-sb">Expected Points:</span>
+                            <span class="stat-value-sb" id="total-xpts">0</span>
                         </div>
                     </div>
-                    <div class="search-container mt-20">
-                        <input type="text" class="search-input" placeholder="Search for a player...">
-                        <div class="search-results"></div>
+                    <div class="stats-box-sb">
+                        <h3>Player Stats</h3>
+                        <div class="player-stats-header-sb">
+                            <span>Player</span>
+                            <span>PPG</span>
+                            <span>Pts</span>
+                            <span>xPts</span>
+                        </div>
+                        <div id="player-stats-list"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="search-modal-sb">
+                <div class="modal-content-sb">
+                    <div class="search-container-sb">
+                        <input type="text" id="searchInput" placeholder="Search for a player...">
+                    </div>
+                    <ul class="player-list-sb"></ul>
+                    <div class="buttons-sb">
+                        <button class="button-sb secondary-sb" id="closeSearch">Close</button>
                     </div>
                 </div>
             </div>
         `;
+
+        this.searchModal = this.container.querySelector('.search-modal-sb');
     }
 
     private createPlayerSlots(count: number, position: string): string {
         return Array(count).fill(0).map(() => `
-            <div class="player-slot" data-position="${position}">
-                <img src="/static/img/shirt.png" alt="Empty slot">
-                <div class="name">${position}</div>
+            <div class="position-slot-sb" data-position="${position}">
+                <div class="position-tag-sb ${position}">${position}</div>
             </div>
         `).join('');
     }
 
     private setupEventListeners(): void {
-        const searchInput = this.container.querySelector('.search-input') as HTMLInputElement;
-        const searchResults = this.container.querySelector('.search-results') as HTMLElement;
-        const playerSlots = this.container.querySelectorAll('.player-slot');
+        const searchInput = this.container.querySelector('#searchInput-sb') as HTMLInputElement;
+        const playerList = this.container.querySelector('.player-list-sb') as HTMLElement;
+        const closeButton = this.container.querySelector('#closeSearch-sb') as HTMLElement;
+        const positionSlots = this.container.querySelectorAll('.position-slot-sb');
+
+        positionSlots.forEach(slot => {
+            slot.addEventListener('click', () => {
+                if (!(slot as HTMLElement).classList.contains('filled-sb')) {
+                    this.currentSlot = slot as HTMLElement;
+                    this.openSearch();
+                }
+            });
+        });
 
         searchInput.addEventListener('input', async () => {
             const query = searchInput.value.trim();
             if (query.length < 2) {
-                searchResults.innerHTML = '';
+                playerList.innerHTML = '';
                 return;
             }
 
             try {
                 const response = await fetch(`/api/players?search=${encodeURIComponent(query)}`);
                 const players = await response.json();
-                this.displaySearchResults(players, searchResults);
+                this.displaySearchResults(players, playerList);
             } catch (error) {
                 console.error('Error searching players:', error);
             }
         });
 
-        playerSlots.forEach(slot => {
-            slot.addEventListener('click', () => {
-                searchInput.focus();
-                searchInput.setAttribute('data-target-position', slot.getAttribute('data-position') || '');
-            });
-        });
+        closeButton.addEventListener('click', () => this.closeSearch());
     }
 
     private displaySearchResults(players: Player[], container: HTMLElement): void {
-        container.innerHTML = players.map(player => `
-            <div class="player-item" data-player-id="${player.id}">
-                <img src="https://resources.premierleague.com/premierleague/photos/players/110x140/p${player.photo}.png" alt="${player.first_name} ${player.second_name}">
-                <div class="player-info">
-                    <div class="player-name">${player.first_name} ${player.second_name}</div>
-                    <div class="player-team">${player.team} · ${player.position}</div>
+        const position = this.currentSlot?.getAttribute('data-position');
+        const filteredPlayers = players.filter(p => p.position === position);
+
+        container.innerHTML = filteredPlayers.map(player => `
+            <li class="player-item-sb" data-player-id="${player.id}">
+                <img class="player-photo-sb" src="https://resources.premierleague.com/premierleague/photos/players/110x140/p${player.photo}.png" 
+                     alt="${player.first_name} ${player.second_name}">
+                <div class="player-info-sb">
+                    <div class="player-name-sb">${player.first_name} ${player.second_name}</div>
+                    <div class="player-team-sb">${player.team}</div>
                 </div>
-            </div>
+            </li>
         `).join('');
 
-        container.querySelectorAll('.player-item').forEach(item => {
+        container.querySelectorAll('.player-item-sb').forEach(item => {
             item.addEventListener('click', () => this.handlePlayerSelection(item));
         });
     }
 
     private async handlePlayerSelection(playerElement: Element): Promise<void> {
         const playerId = playerElement.getAttribute('data-player-id');
-        if (!playerId) return;
+        if (!playerId || !this.currentSlot) return;
 
         try {
             const response = await fetch(`/api/player/${playerId}`);
             const player = await response.json();
-            const targetPosition = (document.querySelector('.search-input') as HTMLInputElement)
-                .getAttribute('data-target-position');
-
-            if (targetPosition && player.position === targetPosition) {
-                this.updatePlayerSlot(player, targetPosition);
-                this.updateSquadStats();
-            }
+            await this.updatePlayerSlot(player);
         } catch (error) {
             console.error('Error fetching player details:', error);
         }
     }
 
-    private updatePlayerSlot(player: Player, position: string): void {
-        const slot = this.container.querySelector(`.player-slot[data-position="${position}"]:not(.filled)`) as HTMLElement;
-        if (!slot) return;
+    private async updatePlayerSlot(player: Player): Promise<void> {
+        if (!this.currentSlot) return;
 
-        slot.innerHTML = `
-            <img src="https://resources.premierleague.com/premierleague/photos/players/110x140/p${player.photo}.png" alt="${player.first_name} ${player.second_name}">
-            <div class="name">${player.first_name} ${player.second_name}</div>
-            <div class="remove-player">×</div>
+        this.currentSlot.innerHTML = `
+            <div class="remove-player-sb">×</div>
+            <img class="player-photo-sb" src="https://resources.premierleague.com/premierleague/photos/players/110x140/p${player.photo}.png" 
+                 alt="${player.first_name} ${player.second_name}">
+            <div class="player-info-box-sb">
+                <div class="player-name-sb">${player.first_name} ${player.second_name}</div>
+                <div class="player-team-sb">${player.team}</div>
+            </div>
+            <div class="player-ppg-sb">${player.ppg.toFixed(1)}</div>
         `;
-        slot.classList.add('filled');
-        slot.setAttribute('data-player-id', player.id.toString());
 
-        const removeButton = slot.querySelector('.remove-player');
+        const removeButton = this.currentSlot.querySelector('.remove-player-sb');
         if (removeButton) {
             removeButton.addEventListener('click', (e) => {
                 e.stopPropagation();
-                this.removePlayer(slot);
+                this.removePlayer(this.currentSlot as HTMLElement);
             });
         }
+
+        this.currentSlot.classList.add('filled-sb');
+        await this.updateSquadStats();
+        this.closeSearch();
     }
 
     private removePlayer(slot: HTMLElement): void {
         const position = slot.getAttribute('data-position');
-        slot.innerHTML = `
-            <img src="/static/img/shirt.png" alt="Empty slot">
-            <div class="name">${position}</div>
-        `;
-        slot.classList.remove('filled');
-        slot.removeAttribute('data-player-id');
+        slot.innerHTML = `<div class="position-tag-sb ${position}">${position}</div>`;
+        slot.classList.remove('filled-sb');
         this.updateSquadStats();
+        this.updatePlayerStatsList();
     }
 
     private async updateSquadStats(): Promise<void> {
-        const filledSlots = this.container.querySelectorAll('.player-slot.filled');
+        const filledSlots = this.container.querySelectorAll('.position-slot-sb.filled-sb');
         let totalPoints = 0;
         let totalXpts = 0;
-        let totalPpg = 0;
 
         for (const slot of filledSlots) {
-            const playerId = slot.getAttribute('data-player-id');
-            if (!playerId) continue;
+            const playerName = slot.querySelector('.player-name-sb')?.textContent;
+            if (!playerName) continue;
 
             try {
-                const response = await fetch(`/api/player/${playerId}`);
-                const player = await response.json();
-                totalPoints += player.points || 0;
-                totalXpts += player.xPts || 0;
-                totalPpg += (player.points / (player.minutes / 90)) || 0;
+                const response = await fetch(`/api/players?search=${encodeURIComponent(playerName)}`);
+                const players = await response.json();
+                if (players.length > 0) {
+                    const player = players[0];
+                    totalPoints += player.points || 0;
+                    totalXpts += player.xPts || 0;
+                }
             } catch (error) {
                 console.error('Error fetching player stats:', error);
             }
         }
 
-        const playerCount = filledSlots.length || 1;
         document.getElementById('total-points')!.textContent = totalPoints.toString();
-        document.getElementById('total-xpts')!.textContent = totalXpts.toFixed(2);
-        document.getElementById('avg-ppg')!.textContent = (totalPpg / playerCount).toFixed(2);
+        document.getElementById('total-xpts')!.textContent = totalXpts.toFixed(1);
+
+        this.updatePlayerStatsList();
     }
-} 
+
+    private async updatePlayerStatsList(): Promise<void> {
+        const statsList = this.container.querySelector('#player-stats-list-sb') as HTMLElement;
+        const filledSlots = this.container.querySelectorAll('.position-slot-sb.filled-sb');
+        let statsHtml = '';
+
+        for (const slot of filledSlots) {
+            const playerName = slot.querySelector('.player-name-sb')?.textContent;
+            if (!playerName) continue;
+
+            try {
+                const response = await fetch(`/api/players?search=${encodeURIComponent(playerName)}`);
+                const players = await response.json();
+                if (players.length > 0) {
+                    const player = players[0];
+                    statsHtml += `
+                        <div class="player-stat-row-sb">
+                            <span class="player-stat-name-sb">${player.first_name} ${player.second_name}</span>
+                            <span class="player-stat-value-sb">${player.ppg.toFixed(2)}</span>
+                            <span class="player-stat-value-sb">${player.points}</span>
+                            <span class="player-stat-value-sb">${player.xPts.toFixed(1)}</span>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                console.error('Error fetching player stats:', error);
+            }
+        }
+
+        statsList.innerHTML = statsHtml;
+    }
+
+    private openSearch(): void {
+        if (this.searchModal) {
+            this.searchModal.style.display = 'block';
+            const searchInput = this.searchModal.querySelector('#searchInput-sb') as HTMLInputElement;
+            searchInput.value = '';
+            searchInput.focus();
+        }
+    }
+
+    private closeSearch(): void {
+        if (this.searchModal) {
+            this.searchModal.style.display = 'none';
+            this.currentSlot = null;
+        }
+    }
+}
