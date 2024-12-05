@@ -157,8 +157,10 @@ function PlayerSearch() {
                     <small>Goals: {stats.actual.points.goals}</small>
                     <small>Assists: {stats.actual.points.assists}</small>
                     <small>Clean Sheets: {stats.actual.points.clean_sheets}</small>
-                    <small>Appearances: {stats.actual.points.appearances}</small>
-                    <small>Bonus & Deductions: {stats.actual.points.bonus_and_deductions}</small>
+                    <small className="tooltip-container">
+                      Other: {stats.actual.points.other}
+                      <span className="tooltip">Includes appearances, bonus points, and deductions</span>
+                    </small>
                   </div>
                 </div>
               </div>
@@ -183,8 +185,10 @@ function PlayerSearch() {
                     <small>Goals: {stats.expected.points.goals}</small>
                     <small>Assists: {stats.expected.points.assists}</small>
                     <small>Clean Sheets: {stats.expected.points.clean_sheets}</small>
-                    <small>Appearances: {stats.expected.points.appearances}</small>
-                    <small>Bonus & Deductions: {stats.expected.points.bonus_and_deductions}</small>
+                    <small className="tooltip-container">
+                      Other: {stats.expected.points.other}
+                      <span className="tooltip">Includes appearances, bonus points, and deductions</span>
+                    </small>
                   </div>
                 </div>
               </div>
@@ -192,6 +196,49 @@ function PlayerSearch() {
           </div>
         </div>
       )}
+      <style>
+        {`
+          .tooltip-container {
+            position: relative;
+            cursor: help;
+            display: inline-block;
+          }
+
+          .tooltip {
+            visibility: hidden;
+            position: absolute;
+            bottom: 100%;
+            left: 0;
+            transform: translateX(0);
+            background-color: #37003c;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            white-space: nowrap;
+            z-index: 1;
+            margin-bottom: 5px;
+            opacity: 0;
+            transition: opacity 0.2s;
+          }
+
+          .tooltip::after {
+            content: '';
+            position: absolute;
+            top: 100%;
+            left: 10px;
+            transform: translateX(0);
+            border-width: 5px;
+            border-style: solid;
+            border-color: #37003c transparent transparent transparent;
+          }
+
+          .tooltip-container:hover .tooltip {
+            visibility: visible;
+            opacity: 1;
+          }
+        `}
+      </style>
     </div>
   );
 }

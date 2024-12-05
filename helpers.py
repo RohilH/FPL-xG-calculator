@@ -58,24 +58,12 @@ def calculate_player_xpts(player, position: Position):
             player["clean_sheets"] * position.clean_sheet_points
         )
 
-    # Calculate appearance points
-    appearance_points = 0
-    if player["minutes"] > 0:
-        appearance_points = 1 if player["minutes"] < 60 else 2
-
-    # Calculate bonus and deductions
-    bonus_and_deductions = player["total_points"] - (
+    # Calculate other points (appearances + bonus + deductions)
+    other_points = player["total_points"] - (
         player["goals_scored"] * position.goal_points
         + player["assists"] * 3
         + (
             player["clean_sheets"] * position.clean_sheet_points
-            if player["minutes"] >= 60
-            else 0
-        )
-        + (
-            1
-            if player["minutes"] > 0 and player["minutes"] < 60
-            else 2
             if player["minutes"] >= 60
             else 0
         )
@@ -85,6 +73,5 @@ def calculate_player_xpts(player, position: Position):
         expected_goals_points
         + expected_assists_points
         + expected_clean_sheet_points
-        + appearance_points
-        + bonus_and_deductions
+        + other_points
     )

@@ -153,7 +153,6 @@ function SquadBuilder() {
         ...player,
         points: stats.actual.points.total,
         xPts: stats.expected.points.total,
-        ppg: (stats.actual.points.total / (stats.actual.stats.minutes / 90)).toFixed(2),
         positionIndex: activeSearch.index
       };
 
@@ -657,7 +656,6 @@ function SquadBuilder() {
                 <thead>
                   <tr style={{ borderBottom: '1px solid #eee' }}>
                     <th style={{ textAlign: 'left', padding: '8px 4px' }}>Player</th>
-                    <th style={{ textAlign: 'right', padding: '8px 4px' }}>PPG</th>
                     <th style={{ textAlign: 'right', padding: '8px 4px' }}>Pts</th>
                     <th style={{ textAlign: 'right', padding: '8px 4px' }}>xPts</th>
                   </tr>
@@ -666,7 +664,6 @@ function SquadBuilder() {
                   {squad.map((player) => (
                     <tr key={player.id} style={{ borderBottom: '1px solid #eee' }}>
                       <td style={{ padding: '8px 4px' }}>{getDisplayName(player.name)}</td>
-                      <td style={{ textAlign: 'right', padding: '8px 4px' }}>{player.ppg}</td>
                       <td style={{ textAlign: 'right', padding: '8px 4px' }}>{player.points}</td>
                       <td style={{ textAlign: 'right', padding: '8px 4px' }}>{player.xPts.toFixed(0)}</td>
                     </tr>

@@ -87,14 +87,9 @@ def get_player(player_id):
         if player["minutes"] >= 60:
             clean_sheet_points = player["clean_sheets"] * position.clean_sheet_points
 
-        # Calculate appearance points
-        appearance_points = 0
-        if player["minutes"] > 0:
-            appearance_points = 1 if player["minutes"] < 60 else 2
-
-        # Calculate bonus and deductions
-        bonus_and_deductions = player["total_points"] - (
-            goals_points + assists_points + clean_sheet_points + appearance_points
+        # Calculate other points (appearances + bonus + deductions)
+        other_points = player["total_points"] - (
+            goals_points + assists_points + clean_sheet_points
         )
 
         # Actual stats
@@ -110,8 +105,7 @@ def get_player(player_id):
             "goals": goals_points,
             "assists": assists_points,
             "clean_sheets": clean_sheet_points,
-            "appearances": appearance_points,
-            "bonus_and_deductions": bonus_and_deductions,
+            "other": other_points,
             "total": player["total_points"],
         }
 
@@ -143,13 +137,11 @@ def get_player(player_id):
             "goals": expected_goals_points,
             "assists": expected_assists_points,
             "clean_sheets": expected_clean_sheet_points,
-            "appearances": appearance_points,
-            "bonus_and_deductions": bonus_and_deductions,
+            "other": other_points,
             "total": expected_goals_points
             + expected_assists_points
             + expected_clean_sheet_points
-            + appearance_points
-            + bonus_and_deductions,
+            + other_points,
         }
 
         return jsonify(
