@@ -12,6 +12,14 @@ function SquadBuilder() {
     expectedPoints: 0
   });
 
+  const resetSquad = () => {
+    setSquad([]);
+    setSquadStats({
+      totalPoints: 0,
+      expectedPoints: 0
+    });
+  };
+
   const getDisplayName = (fullName) => {
     const names = fullName.split(' ');
     if (names.length <= 2) return names[names.length - 1];
@@ -582,7 +590,33 @@ function SquadBuilder() {
 
   return (
     <div>
-      <h1>Squad Builder</h1>
+      <div style={{ 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'center',
+        marginBottom: '20px',
+        maxWidth: 'calc(100% - 324px)' // 300px stats width + 24px gap
+      }}>
+        <h1 style={{ margin: 0 }}>Squad Builder</h1>
+        <button
+          onClick={resetSquad}
+          style={{
+            backgroundColor: '#37003c',
+            color: 'white',
+            border: 'none',
+            padding: '8px 16px',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontSize: '0.9em',
+            transition: 'background-color 0.2s',
+            ':hover': {
+              backgroundColor: '#4a0050'
+            }
+          }}
+        >
+          Reset Squad
+        </button>
+      </div>
       
       <div style={{ display: 'flex', gap: '24px' }}>
         <div style={{ flex: '1' }}>
