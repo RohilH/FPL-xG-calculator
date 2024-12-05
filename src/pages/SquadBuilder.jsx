@@ -7,6 +7,9 @@ function SquadBuilder({ fplData }) {
   const [searchTerm, setSearchTerm] = useState("");
   const [searchResults, setSearchResults] = useState([]);
   const [activeSearch, setActiveSearch] = useState(null);
+  const [selectedGameweek, setSelectedGameweek] = useState("season");
+  const [gameweekData, setGameweekData] = useState({});
+  const [isLoadingGameweeks, setIsLoadingGameweeks] = useState(false);
   const [squadStats, setSquadStats] = useState({
     totalPoints: 0,
     expectedPoints: 0,
@@ -17,6 +20,91 @@ function SquadBuilder({ fplData }) {
     DEF: { row: 1, slots: 5 },
     MID: { row: 2, slots: 5 },
     FWD: { row: 3, slots: 3 },
+  };
+
+  useEffect(() => {
+    const fetchGameweekData = async () => {
+      if (Object.keys(gameweekData).length > 0) return; // Use cached data if available
+
+      setIsLoadingGameweeks(true);
+      try {
+        const completedGameweeks = fplData.events.filter(
+          (event) => event.finished
+        );
+        const gameweekPromises = completedGameweeks.map((gw) =>
+          fetch(`/api/gameweek-data/${gw.id}`)
+            .then((res) => res.json())
+            .then((data) => ({ [gw.id]: data }))
+        );
+
+        const gameweekResults = await Promise.all(gameweekPromises);
+        const combinedGameweekData = gameweekResults.reduce(
+          (acc, curr) => ({ ...acc, ...curr }),
+          {}
+        );
+        setGameweekData(combinedGameweekData);
+      } catch (error) {
+        console.error("Error fetching gameweek data:", error);
+      } finally {
+        setIsLoadingGameweeks(false);
+      }
+    };
+
+    fetchGameweekData();
+  }, []); // Only run once when component mounts
+
+  const getPlayerGameweekStats = (player) => {
+    if (selectedGameweek === "season") {
+      return player.stats;
+    }
+
+    const gwData = gameweekData[selectedGameweek]?.elements.find(
+      (p) => p.id === player.id
+    )?.stats;
+
+    if (!gwData) return { points: 0, xPts: 0 };
+
+    return {
+      points: gwData.total_points,
+      xPts: calculateGameweekXpts(gwData, player.position),
+    };
+  };
+
+  const calculateGameweekXpts = (gwStats, position) => {
+    const minutes = parseFloat(gwStats.minutes);
+    const gamesPlayed = minutes / 90;
+
+    if (gamesPlayed === 0) return 0;
+
+    let xpts = 0;
+
+    // Minutes points
+    xpts += minutes >= 60 ? 2 : 1;
+
+    // Goals points
+    const expectedGoals = parseFloat(gwStats.expected_goals || 0);
+    if (position === "GK" || position === "DEF") {
+      xpts += expectedGoals * 6;
+    } else if (position === "MID") {
+      xpts += expectedGoals * 5;
+    } else {
+      xpts += expectedGoals * 4;
+    }
+
+    // Assists points
+    const expectedAssists = parseFloat(gwStats.expected_assists || 0);
+    xpts += expectedAssists * 3;
+
+    // Clean sheet points
+    if (gwStats.clean_sheets) {
+      if (position === "GK" || position === "DEF") {
+        xpts += 4;
+      } else if (position === "MID") {
+        xpts += 1;
+      }
+    }
+
+    return Math.round(xpts * 10) / 10;
   };
 
   const resetSquad = () => {
@@ -117,15 +205,22 @@ function SquadBuilder({ fplData }) {
 
   const updateSquadStats = (currentSquad) => {
     const stats = currentSquad.reduce(
-      (acc, player) => ({
-        totalPoints: acc.totalPoints + player.stats.points,
-        expectedPoints: acc.expectedPoints + player.stats.xPts,
-      }),
+      (acc, player) => {
+        const playerStats = getPlayerGameweekStats(player);
+        return {
+          totalPoints: acc.totalPoints + playerStats.points,
+          expectedPoints: acc.expectedPoints + playerStats.xPts,
+        };
+      },
       { totalPoints: 0, expectedPoints: 0 }
     );
 
     setSquadStats(stats);
   };
+
+  useEffect(() => {
+    updateSquadStats(squad);
+  }, [selectedGameweek, squad]);
 
   const handleSlotClick = (position, index) => {
     // Calculate current position counts
@@ -268,52 +363,7 @@ function SquadBuilder({ fplData }) {
                 const player = squad.find(
                   (p) => p.position === position && p.positionIndex === index
                 );
-                return (
-                  <div key={index} className="player-card">
-                    {player ? (
-                      <>
-                        <div
-                          className="remove-player"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            removePlayerFromSquad(player.id);
-                          }}
-                        >
-                          ✕
-                        </div>
-                        <div className="player-points">
-                          {player.stats.points}
-                        </div>
-                        <div className="player-card-filled">
-                          <img
-                            src={player.photo}
-                            alt={player.name}
-                            className="player-photo"
-                            onError={(e) => {
-                              e.target.src =
-                                "https://resources.premierleague.com/premierleague/photos/players/110x140/Photo-Missing.png";
-                            }}
-                          />
-                          <div className="player-info-card">
-                            <div className="player-name-card">
-                              {getDisplayName(player.name)}
-                            </div>
-                            <div className="player-team-card">
-                              {player.team}
-                            </div>
-                          </div>
-                        </div>
-                      </>
-                    ) : (
-                      <div
-                        className="player-card-empty"
-                        onClick={() => handleSlotClick(position, index)}
-                      >
-                        <div className="empty-position-label">{position}</div>
-                      </div>
-                    )}
-                  </div>
-                );
+                return renderPlayerCard(player, position, index);
               })}
           </div>
         ))}
@@ -375,6 +425,57 @@ function SquadBuilder({ fplData }) {
     );
   };
 
+  const renderEmptySlot = (position, index) => {
+    return (
+      <div key={`${position}-${index}`} className="player-card">
+        <div
+          key={`${position}-${index}`}
+          className="player-card-empty"
+          onClick={() => handleSlotClick(position, index)}
+        >
+          <div className="empty-position-label">{position}</div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderPlayerCard = (player, position, index) => {
+    if (!player) return renderEmptySlot(position, index);
+
+    const stats = getPlayerGameweekStats(player);
+    const displayName = getDisplayName(player.name);
+
+    return (
+      <div key={`${position}-${index}`} className="player-card">
+        <div
+          className="remove-player"
+          onClick={(e) => {
+            e.stopPropagation();
+            removePlayerFromSquad(player.id);
+          }}
+        >
+          ✕
+        </div>
+        <div className="player-points">{stats.points}</div>
+        <div className="player-card-filled">
+          <img
+            src={player.photo}
+            alt={player.name}
+            className="player-photo"
+            onError={(e) => {
+              e.target.src =
+                "https://resources.premierleague.com/premierleague/photos/players/110x140/Photo-Missing.png";
+            }}
+          />
+          <div className="player-info-card">
+            <div className="player-name-card">{displayName}</div>
+            <div className="player-team-card">{player.team}</div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div>
       <div
@@ -382,31 +483,60 @@ function SquadBuilder({ fplData }) {
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
-          marginTop: "-20px",
+          marginBottom: "20px",
         }}
       >
         <h1>Squad Builder</h1>
-        <button
-          onClick={resetSquad}
-          style={{
-            backgroundColor: "#37003c",
-            color: "white",
-            border: "none",
-            padding: "8px 16px",
-            borderRadius: "4px",
-            cursor: "pointer",
-            fontSize: "16px",
-          }}
-        >
-          Reset Squad
-        </button>
+        <div style={{ display: "flex", gap: "20px", alignItems: "center" }}>
+          {isLoadingGameweeks ? (
+            <div></div>
+          ) : (
+            <select
+              value={selectedGameweek}
+              onChange={(e) => setSelectedGameweek(e.target.value)}
+              style={{
+                padding: "8px 14px",
+                borderRadius: "4px",
+                border: "1px solid #37003c",
+                fontSize: "16px",
+              }}
+            >
+              <option value="season">Entire Season</option>
+              {fplData.events
+                .filter((event) => event.finished)
+                .map((gw) => (
+                  <option key={gw.id} value={gw.id}>
+                    Gameweek {gw.id}
+                  </option>
+                ))}
+            </select>
+          )}
+          <button
+            onClick={resetSquad}
+            style={{
+              backgroundColor: "#37003c",
+              color: "white",
+              border: "none",
+              padding: "8px 16px",
+              borderRadius: "4px",
+              cursor: "pointer",
+              fontSize: "16px",
+            }}
+          >
+            Reset Squad
+          </button>
+        </div>
       </div>
 
       <div style={{ display: "flex", gap: "20px" }}>
         <div style={{ flex: 1 }}>{renderPitch()}</div>
         <div style={{ width: "300px" }}>
           <div className="stat-box">
-            <h3>Squad Stats</h3>
+            <h3>
+              {selectedGameweek === "season"
+                ? "Season Stats"
+                : `Gameweek ${selectedGameweek} Stats`}
+            </h3>
             <div className="stat-item">
               <span className="stat-label">Total Points:</span>
               <span className="stat-value">{squadStats.totalPoints}</span>
@@ -437,19 +567,22 @@ function SquadBuilder({ fplData }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {squad.map((player) => (
-                    <tr key={player.id}>
-                      <td style={{ padding: "8px 4px" }}>
-                        {getDisplayName(player.name)}
-                      </td>
-                      <td style={{ textAlign: "right", padding: "8px 4px" }}>
-                        {player.stats.points}
-                      </td>
-                      <td style={{ textAlign: "right", padding: "8px 4px" }}>
-                        {Math.round(player.stats.xPts)}
-                      </td>
-                    </tr>
-                  ))}
+                  {squad.map((player) => {
+                    const stats = getPlayerGameweekStats(player);
+                    return (
+                      <tr key={player.id}>
+                        <td style={{ padding: "8px 4px" }}>
+                          {getDisplayName(player.name)}
+                        </td>
+                        <td style={{ textAlign: "right", padding: "8px 4px" }}>
+                          {stats.points}
+                        </td>
+                        <td style={{ textAlign: "right", padding: "8px 4px" }}>
+                          {Math.round(stats.xPts)}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

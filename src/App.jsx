@@ -22,7 +22,7 @@ function App() {
         const data = await getFplData();
         setFplData(data);
       } catch (err) {
-        console.error("Error loading FPL data:", err);
+        console.error("Error loading data:", err);
         setError(err.message);
       } finally {
         setIsLoading(false);
@@ -33,7 +33,7 @@ function App() {
   }, []);
 
   if (isLoading) {
-    return <div>Loading FPL data...</div>;
+    return <div></div>;
   }
 
   if (error) {

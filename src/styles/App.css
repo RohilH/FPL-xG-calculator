@@ -353,7 +353,7 @@ h1 {
 .position-row {
   display: flex;
   gap: 24px;
-  justify-content: space-evenly;
+  justify-content: center;
   width: 80%;
 }
 

@@ -1,20 +1,18 @@
 from flask import Flask, jsonify, send_from_directory
 from flask_cors import CORS
 import os
-from helpers import get_fpl_data, get_completed_gameweeks
+from helpers import get_fpl_data, get_gameweek_data
 
 
 app = Flask(__name__, static_folder="dist")
 CORS(app)
 
 
-@app.route("/api/gameweeks")
-def get_gameweeks():
-    """Get list of completed gameweeks"""
-    completed = get_completed_gameweeks()
-    return jsonify(
-        {"gameweeks": [{"id": "season", "name": "Entire Season"}, *completed]}
-    )
+@app.route("/api/gameweek-data/<int:gameweek>")
+def get_raw_gameweek_data(gameweek):
+    """Get detailed stats for a specific gameweek"""
+    data = get_gameweek_data(gameweek=gameweek)
+    return jsonify(data)
 
 
 @app.route("/api/fpl-data")
