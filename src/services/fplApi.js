@@ -28,8 +28,9 @@ export const searchPlayers = async (searchTerm) => {
 
   return fplData.elements
     .filter(player => {
-      const playerName = `${player.first_name} ${player.second_name}`;
-      return normalizeString(playerName).includes(normalizedSearch);
+      const webName = normalizeString(player.web_name);
+      const fullName = normalizeString(`${player.first_name} ${player.second_name}`);
+      return webName.includes(normalizedSearch) || fullName.includes(normalizedSearch);
     })
     .map(player => {
       const position = Position.fromElementType(player.element_type);
@@ -38,7 +39,7 @@ export const searchPlayers = async (searchTerm) => {
         id: player.id,
         first_name: player.first_name,
         second_name: player.second_name,
-        name: `${player.first_name} ${player.second_name}`,
+        name: player.web_name,
         team: fplData.teams[player.team - 1].name,
         photo: `https://resources.premierleague.com/premierleague/photos/players/110x140/p${player.code}.png`,
         position,

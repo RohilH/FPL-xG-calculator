@@ -2,7 +2,6 @@ import React, { useState, useEffect } from "react";
 import { normalizeString } from "../services/fplApi";
 import { formatPlayerData } from "../services/playerHelpers";
 import { formatPlayerStats } from "../services/statsHelper";
-import { Position } from "../enums";
 
 function PlayerSearch({ fplData }) {
   const [searchTerm, setSearchTerm] = useState("");
@@ -15,7 +14,7 @@ function PlayerSearch({ fplData }) {
     const debounceTimeout = setTimeout(() => {
       if (
         searchTerm.length >= 3 &&
-        (!selectedPlayer || searchTerm !== selectedPlayer.name)
+        (!selectedPlayer || searchTerm !== selectedPlayer.display_name)
       ) {
         searchPlayers();
         setShowDropdown(true);
@@ -36,7 +35,10 @@ function PlayerSearch({ fplData }) {
         const playerName = `${player.first_name} ${player.second_name}`;
         return normalizeString(playerName).includes(normalizedSearch);
       })
-      .map((player) => formatPlayerData(player, fplData));
+      .map((player) => ({
+        ...formatPlayerData(player, fplData),
+        display_name: `${player.first_name} ${player.second_name}`,
+      }));
 
     setPlayers(results);
   };
@@ -44,7 +46,7 @@ function PlayerSearch({ fplData }) {
   const handlePlayerSelect = (player) => {
     setSelectedPlayer(player);
     setPlayers([]);
-    setSearchTerm(player.name);
+    setSearchTerm(player.display_name);
     setShowDropdown(false);
     setStats(formatPlayerStats(player));
   };
@@ -112,7 +114,7 @@ function PlayerSearch({ fplData }) {
               <li key={player.id} onClick={() => handlePlayerSelect(player)}>
                 <img
                   src={player.photo}
-                  alt={player.name}
+                  alt={player.display_name}
                   className="player-photo"
                   onError={(e) => {
                     e.target.src =
@@ -120,7 +122,7 @@ function PlayerSearch({ fplData }) {
                   }}
                 />
                 <div className="player-info">
-                  <div className="player-name">{player.name}</div>
+                  <div className="player-name">{player.display_name}</div>
                   <div className="player-team">{player.team}</div>
                 </div>
               </li>
@@ -134,14 +136,14 @@ function PlayerSearch({ fplData }) {
           <div className="stats-header">
             <img
               src={selectedPlayer.photo}
-              alt={selectedPlayer.name}
+              alt={selectedPlayer.display_name}
               onError={(e) => {
                 e.target.src =
                   "https://resources.premierleague.com/premierleague/photos/players/110x140/Photo-Missing.png";
               }}
             />
             <div className="stats-header-info">
-              <h2>{selectedPlayer.name}</h2>
+              <h2>{selectedPlayer.display_name}</h2>
               <p>{selectedPlayer.team}</p>
             </div>
           </div>

@@ -56,7 +56,7 @@ export const formatPlayerData = (player, fplData) => {
     id: player.id,
     first_name: player.first_name,
     second_name: player.second_name,
-    name: `${player.first_name} ${player.second_name}`,
+    name: player.web_name,
     team: fplData.teams[player.team - 1].name,
     photo: `https://resources.premierleague.com/premierleague/photos/players/110x140/p${player.code}.png`,
     position,
