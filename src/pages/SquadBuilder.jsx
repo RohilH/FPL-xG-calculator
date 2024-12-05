@@ -644,7 +644,7 @@ function SquadBuilder() {
           </div>
 
           {squad.length > 0 && (
-            <div className="stats-container" style={{ marginTop: '20px' }}>
+            <div className="stats-container" style={{ marginBottom: '20px' }}>
               <h2 style={{ 
                 color: '#37003c',
                 borderBottom: '2px solid #00ff87',
