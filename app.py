@@ -2,7 +2,12 @@ from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 import os
 from enums import Position
-from helpers import calculate_player_xpts, get_fpl_data, normalize_name
+from helpers import (
+    calculate_player_xpts,
+    get_fpl_data,
+    normalize_name,
+    get_player_stats,
+)
 
 
 app = Flask(__name__, static_folder="dist")
@@ -77,79 +82,7 @@ def get_player(player_id):
             return jsonify({"error": "Player not found"}), 404
 
         position = Position.from_element_type(player["element_type"])
-
-        # Calculate points from goals and assists
-        goals_points = player["goals_scored"] * position.goal_points
-        assists_points = player["assists"] * 3
-
-        # Calculate clean sheet points based on position and minutes
-        clean_sheet_points = 0
-        if player["minutes"] >= 60:
-            clean_sheet_points = player["clean_sheets"] * position.clean_sheet_points
-
-        # Calculate other points (appearances + bonus + deductions)
-        other_points = player["total_points"] - (
-            goals_points + assists_points + clean_sheet_points
-        )
-
-        # Actual stats
-        actual_stats = {
-            "goals": player["goals_scored"],
-            "assists": player["assists"],
-            "clean_sheets": player["clean_sheets"],
-            "minutes": player["minutes"],
-        }
-
-        # Actual points breakdown
-        actual_points = {
-            "goals": goals_points,
-            "assists": assists_points,
-            "clean_sheets": clean_sheet_points,
-            "other": other_points,
-            "total": player["total_points"],
-        }
-
-        # Calculate expected goals and assists points
-        expected_goals = round(float(player.get("expected_goals", "0")))
-        expected_assists = round(float(player.get("expected_assists", "0")))
-
-        expected_goals_points = expected_goals * position.goal_points
-        expected_assists_points = expected_assists * 3
-
-        # Calculate expected clean sheet points (using actual clean sheets)
-        expected_clean_sheet_points = 0
-        if player["minutes"] >= 60:
-            expected_clean_sheet_points = (
-                player["clean_sheets"] * position.clean_sheet_points
-            )
-
-        # Expected stats
-        expected_stats = {
-            "raw_xg": float(player.get("expected_goals", "0")),
-            "raw_xa": float(player.get("expected_assists", "0")),
-            "expected_goals": expected_goals,
-            "expected_assists": expected_assists,
-            "clean_sheets": player["clean_sheets"],
-        }
-
-        # Expected points breakdown
-        expected_points = {
-            "goals": expected_goals_points,
-            "assists": expected_assists_points,
-            "clean_sheets": expected_clean_sheet_points,
-            "other": other_points,
-            "total": expected_goals_points
-            + expected_assists_points
-            + expected_clean_sheet_points
-            + other_points,
-        }
-
-        return jsonify(
-            {
-                "actual": {"stats": actual_stats, "points": actual_points},
-                "expected": {"stats": expected_stats, "points": expected_points},
-            }
-        )
+        return jsonify(get_player_stats(player, position))
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
