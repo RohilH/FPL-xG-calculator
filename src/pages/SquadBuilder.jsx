@@ -1,208 +1,128 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect } from "react";
+import { formatPlayerData } from "../services/playerHelpers";
+import { filterPlayersByPosition } from "../services/squadHelpers";
 
-function SquadBuilder() {
+function SquadBuilder({ fplData }) {
   const [squad, setSquad] = useState([]);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState("");
   const [searchResults, setSearchResults] = useState([]);
   const [activeSearch, setActiveSearch] = useState(null);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [hasMore, setHasMore] = useState(true);
-  const [isInitialLoad, setIsInitialLoad] = useState(true);
-  const [isFetching, setIsFetching] = useState(false);
   const [squadStats, setSquadStats] = useState({
     totalPoints: 0,
-    expectedPoints: 0
+    expectedPoints: 0,
   });
 
-  const searchListRef = useRef(null);
-  const lastScrollTime = useRef(0);
+  const positions = {
+    GK: { row: 0, slots: 1 },
+    DEF: { row: 1, slots: 5 },
+    MID: { row: 2, slots: 5 },
+    FWD: { row: 3, slots: 3 },
+  };
 
   const resetSquad = () => {
     setSquad([]);
     setSquadStats({
       totalPoints: 0,
-      expectedPoints: 0
+      expectedPoints: 0,
     });
-  };
-
-  const getDisplayName = (fullName) => {
-    const names = fullName.split(' ');
-    if (names.length <= 2) return names[names.length - 1];
-    
-    // For names like "Van Dijk", "De Bruyne", etc.
-    const commonPrefixes = ['van', 'de', 'der', 'den', 'dos', 'da', 'di'];
-    const secondToLast = names[names.length - 2].toLowerCase();
-    
-    if (commonPrefixes.includes(secondToLast)) {
-      return `${names[names.length - 2]} ${names[names.length - 1]}`;
-    }
-    
-    return names[names.length - 1];
   };
 
   useEffect(() => {
     if (activeSearch) {
-      setCurrentPage(1);
-      setHasMore(true);
-      setIsInitialLoad(true);
-      setSearchResults([]);
-      fetchPositionPlayers(1, true);
+      if (searchTerm.length >= 3) {
+        updateSearchResults();
+      } else {
+        // Show all players in position when no search term
+        const positionPlayers = filterPlayersByPosition(
+          fplData.elements,
+          activeSearch.position
+        )
+          .filter((player) => !squad.some((p) => p.id === player.id))
+          .map((player) => formatPlayerData(player, fplData))
+          .sort((a, b) => b.stats.points - a.stats.points);
+        setSearchResults(positionPlayers);
+      }
     } else {
       setSearchResults([]);
-      setSearchTerm('');
-      setCurrentPage(1);
-      setHasMore(true);
-      setIsInitialLoad(true);
+      setSearchTerm("");
     }
   }, [activeSearch]);
 
   useEffect(() => {
     if (activeSearch) {
       const debounceTimeout = setTimeout(() => {
-        setCurrentPage(1);
-        setSearchResults([]);
-        setHasMore(true);
-        fetchPositionPlayers(1, true);
+        if (searchTerm.length >= 3) {
+          updateSearchResults();
+        } else if (searchTerm.length === 0) {
+          // Reset to all position players when search is cleared
+          const positionPlayers = filterPlayersByPosition(
+            fplData.elements,
+            activeSearch.position
+          )
+            .filter((player) => !squad.some((p) => p.id === player.id))
+            .map((player) => formatPlayerData(player, fplData))
+            .sort((a, b) => b.stats.points - a.stats.points);
+          setSearchResults(positionPlayers);
+        }
       }, 300);
 
       return () => clearTimeout(debounceTimeout);
     }
   }, [searchTerm]);
 
-  const handleScroll = useCallback((e) => {
-    const now = Date.now();
-    if (now - lastScrollTime.current < 100) return; // Throttle to max one request per 100ms
-    
-    const bottom = e.target.scrollHeight - e.target.scrollTop <= e.target.clientHeight + 100;
-    if (bottom && hasMore && !isInitialLoad && !isFetching) {
-      lastScrollTime.current = now;
-      fetchPositionPlayers(currentPage + 1);
-    }
-  }, [currentPage, hasMore, isInitialLoad, isFetching]);
+  const updateSearchResults = () => {
+    if (!activeSearch) return;
 
-  const fetchPositionPlayers = async (page, isNewSearch = false) => {
-    if (!activeSearch || (!hasMore && !isNewSearch) || (isFetching && !isNewSearch)) return;
-    
-    setIsFetching(true);
-    try {
-      const params = new URLSearchParams({
-        position: activeSearch.position,
-        page: page,
-        per_page: 10
-      });
-      
-      if (searchTerm) {
-        params.append('search', searchTerm);
-      }
+    const filteredPlayers = filterPlayersByPosition(
+      fplData.elements,
+      activeSearch.position,
+      searchTerm
+    )
+      .filter((player) => !squad.some((p) => p.id === player.id))
+      .map((player) => formatPlayerData(player, fplData));
 
-      const response = await fetch(`/api/position-players?${params}`);
-      const data = await response.json();
-      
-      setSearchResults(prev => isNewSearch ? data.players : [...prev, ...data.players]);
-      setHasMore(data.has_more);
-      setCurrentPage(page);
-      setIsInitialLoad(false);
-    } catch (error) {
-      console.error('Error fetching players:', error);
-    } finally {
-      setIsFetching(false);
-    }
+    setSearchResults(filteredPlayers);
   };
 
-  const addPlayerToSquad = async (player) => {
-    // Check for duplicate player
-    if (squad.some(p => p.id === player.id)) {
-      alert('This player is already in your squad!');
-      return;
-    }
+  const addPlayerToSquad = (player) => {
+    const playerWithStats = {
+      ...player,
+      points: player.stats.points,
+      positionIndex: activeSearch.index,
+      position: activeSearch.position,
+    };
 
-    // Calculate current position counts
-    const positionCounts = squad.reduce((counts, p) => {
-      counts[p.position] = (counts[p.position] || 0) + 1;
-      return counts;
-    }, {});
+    // Replace player at the specific position index
+    const newSquad = squad.filter(
+      (p) =>
+        !(
+          p.position === activeSearch.position &&
+          p.positionIndex === activeSearch.index
+        )
+    );
+    newSquad.push(playerWithStats);
 
-    // Check total squad size
-    if (squad.length >= 11) {
-      alert('Squad is full! Remove a player first.');
-      return;
-    }
-
-    // Validate position-specific rules
-    const newPositionCount = (positionCounts[player.position] || 0) + 1;
-    const remainingSlots = 11 - squad.length - 1; // -1 for current player being added
-
-    // Position-specific validations
-    if (player.position === 'GK' && newPositionCount > 1) {
-      alert('You can only have one goalkeeper!');
-      return;
-    }
-
-    if (player.position === 'DEF' && newPositionCount > 5) {
-      alert('You can only have up to 5 defenders!');
-      return;
-    }
-
-    if (player.position === 'MID' && newPositionCount > 5) {
-      alert('You can only have up to 5 midfielders!');
-      return;
-    }
-
-    if (player.position === 'FWD' && newPositionCount > 3) {
-      alert('You can only have up to 3 forwards!');
-      return;
-    }
-
-    // Check if adding this player would prevent having at least 1 forward
-    if (player.position !== 'FWD') {
-      const currentNonFwdCount = (positionCounts['DEF'] || 0) + (positionCounts['MID'] || 0);
-      const newNonFwdCount = currentNonFwdCount + 1;
-      const maxNonFwdPlayers = 10; // 11 total - 1 minimum forward
-
-      if (newNonFwdCount > maxNonFwdPlayers) {
-        alert('You must leave space for at least one forward!');
-        return;
-      }
-    }
-
-    try {
-      const response = await fetch(`/api/player/${player.id}`);
-      const stats = await response.json();
-      
-      const playerWithStats = {
-        ...player,
-        points: stats.actual.points.total,
-        xPts: stats.expected.points.total,
-        positionIndex: activeSearch.index
-      };
-
-      // Replace player at the specific position index
-      const newSquad = squad.filter(p => 
-        !(p.position === player.position && p.positionIndex === activeSearch.index)
-      );
-      newSquad.push(playerWithStats);
-
-      setSquad(newSquad);
-      setSearchTerm('');
-      setSearchResults([]);
-      setActiveSearch(null);
-      updateSquadStats(newSquad);
-    } catch (error) {
-      console.error('Error adding player:', error);
-    }
+    setSquad(newSquad);
+    setSearchTerm("");
+    setSearchResults([]);
+    setActiveSearch(null);
+    updateSquadStats(newSquad);
   };
 
   const removePlayerFromSquad = (playerId) => {
-    const newSquad = squad.filter(player => player.id !== playerId);
+    const newSquad = squad.filter((player) => player.id !== playerId);
     setSquad(newSquad);
     updateSquadStats(newSquad);
   };
 
   const updateSquadStats = (currentSquad) => {
-    const stats = currentSquad.reduce((acc, player) => ({
-      totalPoints: acc.totalPoints + player.points,
-      expectedPoints: acc.expectedPoints + player.xPts
-    }), { totalPoints: 0, expectedPoints: 0 });
+    const stats = currentSquad.reduce(
+      (acc, player) => ({
+        totalPoints: acc.totalPoints + player.stats.points,
+        expectedPoints: acc.expectedPoints + player.stats.xPts,
+      }),
+      { totalPoints: 0, expectedPoints: 0 }
+    );
 
     setSquadStats(stats);
   };
@@ -216,53 +136,53 @@ function SquadBuilder() {
 
     // Check if squad is already full
     if (squad.length >= 11) {
-      alert('Squad is full! Remove a player first.');
+      alert("Squad is full! Remove a player first.");
       return;
     }
 
     // Check basic position limits
-    if (position === 'GK' && (positionCounts['GK'] || 0) >= 1) {
-      alert('You can only have one goalkeeper!');
+    if (position === "GK" && (positionCounts["GK"] || 0) >= 1) {
+      alert("You can only have one goalkeeper!");
       return;
     }
 
-    if (position === 'DEF' && (positionCounts['DEF'] || 0) >= 5) {
-      alert('You can only have up to 5 defenders!');
+    if (position === "DEF" && (positionCounts["DEF"] || 0) >= 5) {
+      alert("You can only have up to 5 defenders!");
       return;
     }
 
-    if (position === 'MID' && (positionCounts['MID'] || 0) >= 5) {
-      alert('You can only have up to 5 midfielders!');
+    if (position === "MID" && (positionCounts["MID"] || 0) >= 5) {
+      alert("You can only have up to 5 midfielders!");
       return;
     }
 
-    if (position === 'FWD' && (positionCounts['FWD'] || 0) >= 3) {
-      alert('You can only have up to 3 forwards!');
+    if (position === "FWD" && (positionCounts["FWD"] || 0) >= 3) {
+      alert("You can only have up to 3 forwards!");
       return;
     }
 
     // Special validation for the 11th player selection
     if (squad.length === 10) {
       const futurePositionCounts = {
-        GK: (positionCounts['GK'] || 0) + (position === 'GK' ? 1 : 0),
-        DEF: (positionCounts['DEF'] || 0) + (position === 'DEF' ? 1 : 0),
-        MID: (positionCounts['MID'] || 0) + (position === 'MID' ? 1 : 0),
-        FWD: (positionCounts['FWD'] || 0) + (position === 'FWD' ? 1 : 0)
+        GK: (positionCounts["GK"] || 0) + (position === "GK" ? 1 : 0),
+        DEF: (positionCounts["DEF"] || 0) + (position === "DEF" ? 1 : 0),
+        MID: (positionCounts["MID"] || 0) + (position === "MID" ? 1 : 0),
+        FWD: (positionCounts["FWD"] || 0) + (position === "FWD" ? 1 : 0),
       };
 
       // Check final squad composition rules
       if (futurePositionCounts.GK !== 1) {
-        alert('Final squad must have exactly 1 goalkeeper!');
+        alert("Final squad must have exactly 1 goalkeeper!");
         return;
       }
 
       if (futurePositionCounts.DEF < 3) {
-        alert('Final squad must have at least 3 defenders!');
+        alert("Final squad must have at least 3 defenders!");
         return;
       }
 
       if (futurePositionCounts.FWD < 1) {
-        alert('Final squad must have at least 1 forward!');
+        alert("Final squad must have at least 1 forward!");
         return;
       }
     } else {
@@ -270,37 +190,47 @@ function SquadBuilder() {
       const minRequiredPlayers = {
         GK: 1,
         DEF: 3,
-        FWD: 1
+        FWD: 1,
       };
 
       // Calculate remaining slots after this selection
       const remainingSlots = 10 - squad.length;
       const futurePositionCounts = {
-        GK: (positionCounts['GK'] || 0) + (position === 'GK' ? 1 : 0),
-        DEF: (positionCounts['DEF'] || 0) + (position === 'DEF' ? 1 : 0),
-        MID: (positionCounts['MID'] || 0) + (position === 'MID' ? 1 : 0),
-        FWD: (positionCounts['FWD'] || 0) + (position === 'FWD' ? 1 : 0)
+        GK: (positionCounts["GK"] || 0) + (position === "GK" ? 1 : 0),
+        DEF: (positionCounts["DEF"] || 0) + (position === "DEF" ? 1 : 0),
+        MID: (positionCounts["MID"] || 0) + (position === "MID" ? 1 : 0),
+        FWD: (positionCounts["FWD"] || 0) + (position === "FWD" ? 1 : 0),
       };
 
       // Check if we can still meet minimum requirements
       if (futurePositionCounts.GK > minRequiredPlayers.GK) {
-        alert('You can only have 1 goalkeeper!');
+        alert("You can only have 1 goalkeeper!");
         return;
       }
 
-      const slotsNeededForDef = Math.max(0, minRequiredPlayers.DEF - futurePositionCounts.DEF);
-      const slotsNeededForFwd = Math.max(0, minRequiredPlayers.FWD - futurePositionCounts.FWD);
-      const slotsNeededForGK = Math.max(0, minRequiredPlayers.GK - futurePositionCounts.GK);
-      
-      const totalSlotsNeeded = slotsNeededForDef + slotsNeededForFwd + slotsNeededForGK;
-      
+      const slotsNeededForDef = Math.max(
+        0,
+        minRequiredPlayers.DEF - futurePositionCounts.DEF
+      );
+      const slotsNeededForFwd = Math.max(
+        0,
+        minRequiredPlayers.FWD - futurePositionCounts.FWD
+      );
+      const slotsNeededForGK = Math.max(
+        0,
+        minRequiredPlayers.GK - futurePositionCounts.GK
+      );
+
+      const totalSlotsNeeded =
+        slotsNeededForDef + slotsNeededForFwd + slotsNeededForGK;
+
       if (remainingSlots < totalSlotsNeeded) {
         if (slotsNeededForDef > 0) {
-          alert('You must leave enough slots for at least 3 defenders!');
+          alert("You must leave enough slots for at least 3 defenders!");
         } else if (slotsNeededForFwd > 0) {
-          alert('You must leave enough slots for at least 1 forward!');
+          alert("You must leave enough slots for at least 1 forward!");
         } else if (slotsNeededForGK > 0) {
-          alert('You must leave a slot for a goalkeeper!');
+          alert("You must leave a slot for a goalkeeper!");
         }
         return;
       }
@@ -308,303 +238,137 @@ function SquadBuilder() {
 
     // If we get here, it's safe to search
     setSearchResults([]);
-    setSearchTerm('');
+    setSearchTerm("");
     setActiveSearch({ position, index });
-    fetchPositionPlayers();
+  };
+
+  const getDisplayName = (fullName) => {
+    const names = fullName.split(" ");
+    if (names.length <= 2) return names[names.length - 1];
+
+    // For names like "Van Dijk", "De Bruyne", etc.
+    const commonPrefixes = ["van", "de", "der", "den", "dos", "da", "di"];
+    const secondToLast = names[names.length - 2].toLowerCase();
+
+    if (commonPrefixes.includes(secondToLast)) {
+      return `${names[names.length - 2]} ${names[names.length - 1]}`;
+    }
+
+    return names[names.length - 1];
   };
 
   const renderPitch = () => {
-    const positions = {
-      GK: { row: 0, slots: 1 },
-      DEF: { row: 1, slots: 5 },
-      MID: { row: 2, slots: 5 },
-      FWD: { row: 3, slots: 3 }
-    };
-
     return (
-      <div style={{ 
-        backgroundColor: '#00ff87',
-        padding: '30px',
-        borderRadius: '8px',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '15px',
-        alignItems: 'center',
-        minHeight: '600px',
-        position: 'relative'
-      }}>
+      <div className="pitch">
         {Object.entries(positions).map(([position, config]) => (
-          <div key={position} style={{
-            display: 'flex',
-            gap: '15px',
-            justifyContent: 'space-evenly',
-            width: '80%'
-          }}>
-            {Array(config.slots).fill(null).map((_, index) => {
-              const player = squad.find(p => 
-                p.position === position && p.positionIndex === index
-              );
-              return (
-                <div key={index} style={{ position: 'relative' }}>
-                  {player && (
-                    <>
-                      <div 
-                        style={{ 
-                          position: 'absolute', 
-                          top: '-8px', 
-                          left: '-8px', 
-                          cursor: 'pointer', 
-                          zIndex: 2,
-                          width: '20px',
-                          height: '20px',
-                          backgroundColor: '#37003c',
-                          color: 'white',
-                          borderRadius: '50%',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontSize: '12px',
-                          fontWeight: 'bold',
-                          ':hover': {
-                            backgroundColor: '#ff3477'
-                          }
-                        }}
-                        onClick={(e) => { e.stopPropagation(); removePlayerFromSquad(player.id); }}
-                      >
-                        ✕
-                      </div>
-                      <div 
-                        style={{ 
-                          position: 'absolute', 
-                          top: '-8px', 
-                          right: '-8px',
-                          backgroundColor: 'white',
-                          padding: '4px 8px',
-                          borderRadius: '6px',
-                          fontSize: '0.8em',
-                          fontWeight: '600',
-                          color: '#37003c',
-                          zIndex: 2,
-                          boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-                        }}
-                      >
-                        {player.points}
-                      </div>
-                    </>
-                  )}
-                  <div 
-                    style={{
-                      width: player ? '106px' : '94px',
-                      height: player ? '128px' : '124px',
-                      border: player ? 'none' : '2px dashed rgba(255, 255, 255, 0.5)',
-                      borderRadius: '8px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      backgroundColor: player ? '#04b660' : 'rgba(255, 255, 255, 0.2)',
-                      position: 'relative',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s',
-                      boxShadow: player ? '0 4px 4px rgba(0,0,0,0.1)' : 'none',
-                      overflow: 'hidden',
-                      ':hover': {
-                        backgroundColor: player ? '#04b660' : 'rgba(255, 255, 255, 0.3)'
-                      }
-                    }}
-                    onClick={() => !player && handleSlotClick(position, index)}
-                  >
+          <div key={position} className="position-row">
+            {Array(config.slots)
+              .fill(null)
+              .map((_, index) => {
+                const player = squad.find(
+                  (p) => p.position === position && p.positionIndex === index
+                );
+                return (
+                  <div key={index} className="player-card">
                     {player ? (
                       <>
-                        <img 
-                          src={player.photo}
-                          alt={player.name}
-                          style={{ 
-                            width: '60px', 
-                            height: '75px', 
-                            objectFit: 'contain',
-                            filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))',
-                            position: 'relative',
-                            zIndex: 1
+                        <div
+                          className="remove-player"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            removePlayerFromSquad(player.id);
                           }}
-                          onError={(e) => {
-                            e.target.src = 'https://resources.premierleague.com/premierleague/photos/players/110x140/Photo-Missing.png';
-                          }}
-                        />
-                        <div style={{ 
-                          backgroundColor: 'rgba(255, 255, 255, 0.9)',
-                          padding: '4px 8px',
-                          borderRadius: '0 0 6px 6px',
-                          width: '100%',
-                          textAlign: 'center',
-                          marginTop: '-4px',
-                          zIndex: 2
-                        }}>
-                          <div style={{
-                            fontSize: '0.8em',
-                            fontWeight: '600',
-                            color: '#37003c',
-                            marginBottom: '2px',
-                            whiteSpace: 'nowrap',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            backgroundColor: 'white',
-                            padding: '4px',
-                            borderRadius: '0'
-                          }}>
-                            {getDisplayName(player.name)}
-                          </div>
-                          <div style={{ 
-                            fontSize: '0.7em',
-                            color: '#666',
-                            backgroundColor: '#f0f0f0',
-                            padding: '4px',
-                            borderRadius: '0 0 6px 6px'
-                          }}>
-                            {player.team}
+                        >
+                          ✕
+                        </div>
+                        <div className="player-points">
+                          {player.stats.points}
+                        </div>
+                        <div className="player-card-filled">
+                          <img
+                            src={player.photo}
+                            alt={player.name}
+                            className="player-photo"
+                            onError={(e) => {
+                              e.target.src =
+                                "https://resources.premierleague.com/premierleague/photos/players/110x140/Photo-Missing.png";
+                            }}
+                          />
+                          <div className="player-info-card">
+                            <div className="player-name-card">
+                              {getDisplayName(player.name)}
+                            </div>
+                            <div className="player-team-card">
+                              {player.team}
+                            </div>
                           </div>
                         </div>
                       </>
                     ) : (
-                      <div style={{ color: '#37003c', opacity: 0.5 }}>{position}</div>
+                      <div
+                        className="player-card-empty"
+                        onClick={() => handleSlotClick(position, index)}
+                      >
+                        <div className="empty-position-label">{position}</div>
+                      </div>
                     )}
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
           </div>
         ))}
 
-        {/* Position-specific search overlay */}
-        {activeSearch && !isInitialLoad && (
-          <div style={{
-            position: 'absolute',
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%, -50%)',
-            width: '80%',
-            maxWidth: '500px',
-            backgroundColor: 'white',
-            borderRadius: '8px',
-            padding: '20px',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-            zIndex: 1000
-          }}>
-            <div style={{ 
-              display: 'flex', 
-              justifyContent: 'space-between', 
-              alignItems: 'center', 
-              marginBottom: '16px' 
-            }}>
-              <input
-                type="text"
-                className="search-input"
-                placeholder="Search for a player..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                autoFocus
-                style={{
-                  flex: 1,
-                  padding: '12px 16px',
-                  fontSize: '16px',
-                  border: '2px solid #00ff87',
-                  borderRadius: '8px',
-                  outline: 'none'
-                }}
-              />
-              <button 
-                onClick={() => setActiveSearch(null)}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  fontSize: '20px',
-                  cursor: 'pointer',
-                  padding: '4px 8px',
-                  marginLeft: '12px'
-                }}
-              >
-                ✕
-              </button>
-            </div>
-
-            <ul 
-              className="player-list" 
-              ref={searchListRef}
-              onScroll={handleScroll}
-              style={{ 
-                maxHeight: '400px',
-                overflowY: 'auto',
-                position: 'static',
-                marginTop: '12px',
-                padding: 0,
-                listStyle: 'none',
-                border: '1px solid #eee',
-                borderRadius: '8px'
-              }}
-            >
-              {searchResults.map((player) => (
-                <li 
-                  key={player.id} 
-                  onClick={() => addPlayerToSquad(player)}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    padding: '12px',
-                    gap: '12px',
-                    borderBottom: '1px solid #eee',
-                    cursor: 'pointer',
-                    transition: 'background-color 0.2s',
-                    ':hover': {
-                      backgroundColor: '#f8f8f8'
-                    }
-                  }}
+        {activeSearch && (
+          <div className="search-overlay">
+            <div className="search-container">
+              <div className="search-header">
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder={`Search ${activeSearch.position.toLowerCase()}s...`}
+                  className="search-input"
+                  autoFocus
+                />
+                <button
+                  onClick={() => setActiveSearch(null)}
+                  className="close-button"
                 >
-                  <img 
-                    src={player.photo} 
-                    alt={player.name}
-                    style={{
-                      width: '44px',
-                      height: '56px',
-                      objectFit: 'cover',
-                      borderRadius: '4px'
-                    }}
-                    onError={(e) => {
-                      e.target.src = 'https://resources.premierleague.com/premierleague/photos/players/110x140/Photo-Missing.png';
-                    }}
-                  />
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 600, color: '#37003c' }}>
-                      {getDisplayName(player.name)}
-                    </div>
-                    <div style={{ 
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      fontSize: '0.9em',
-                      color: '#666',
-                      backgroundColor: 'white',
-                      display: 'inline-block',
-                      padding: '2px 4px',
-                      borderRadius: '2px',
-                      marginTop: '2px'
-                    }}>
-                      <span>{player.team}</span>
-                      <span>·</span>
-                      <span>{player.points} pts</span>
-                    </div>
-                  </div>
-                  <div style={{
-                    padding: '4px 8px',
-                    backgroundColor: '#f8f8f8',
-                    borderRadius: '4px',
-                    fontSize: '0.9em',
-                    color: '#666'
-                  }}>
-                    {player.position}
-                  </div>
-                </li>
-              ))}
-            </ul>
+                  ✕
+                </button>
+              </div>
+              <div className="search-results">
+                {searchResults.length > 0
+                  ? searchResults.map((player) => (
+                      <div
+                        key={player.id}
+                        className="player-result"
+                        onClick={() => addPlayerToSquad(player)}
+                      >
+                        <img
+                          src={player.photo}
+                          alt={player.name}
+                          onError={(e) => {
+                            e.target.src =
+                              "https://resources.premierleague.com/premierleague/photos/players/110x140/Photo-Missing.png";
+                          }}
+                        />
+                        <div className="player-info">
+                          <div className="player-name">
+                            {getDisplayName(player.name)}
+                          </div>
+                          <div className="player-team">{player.team}</div>
+                        </div>
+                        <div className="player-stats">
+                          <div>Pts: {player.stats.points}</div>
+                        </div>
+                      </div>
+                    ))
+                  : searchTerm.length >= 3 && (
+                      <div className="no-results">No players found</div>
+                    )}
+              </div>
+            </div>
           </div>
         )}
       </div>
@@ -613,83 +377,77 @@ function SquadBuilder() {
 
   return (
     <div>
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'space-between', 
-        alignItems: 'center',
-        marginBottom: '20px',
-        maxWidth: 'calc(100% - 324px)' // 300px stats width + 24px gap
-      }}>
-        <h1 style={{ margin: 0 }}>Squad Builder</h1>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginTop: "-20px",
+        }}
+      >
+        <h1>Squad Builder</h1>
         <button
           onClick={resetSquad}
           style={{
-            backgroundColor: '#37003c',
-            color: 'white',
-            border: 'none',
-            padding: '8px 16px',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            fontSize: '0.9em',
-            transition: 'background-color 0.2s',
-            ':hover': {
-              backgroundColor: '#4a0050'
-            }
+            backgroundColor: "#37003c",
+            color: "white",
+            border: "none",
+            padding: "8px 16px",
+            borderRadius: "4px",
+            cursor: "pointer",
+            fontSize: "16px",
           }}
         >
           Reset Squad
         </button>
       </div>
-      
-      <div style={{ display: 'flex', gap: '24px' }}>
-        <div style={{ flex: '1' }}>
-          {renderPitch()}
-        </div>
 
-        <div style={{ width: '300px' }}>
-          <div className="stats-container">
-            <h2 style={{ 
-              color: '#37003c',
-              borderBottom: '2px solid #00ff87',
-              paddingBottom: '10px',
-              marginTop: 0
-            }}>
-              Squad Stats
-            </h2>
+      <div style={{ display: "flex", gap: "20px" }}>
+        <div style={{ flex: 1 }}>{renderPitch()}</div>
+        <div style={{ width: "300px" }}>
+          <div className="stat-box">
+            <h3>Squad Stats</h3>
             <div className="stat-item">
               <span className="stat-label">Total Points:</span>
               <span className="stat-value">{squadStats.totalPoints}</span>
             </div>
             <div className="stat-item">
               <span className="stat-label">Expected Points:</span>
-              <span className="stat-value">{squadStats.expectedPoints.toFixed(0)}</span>
+              <span className="stat-value">
+                {Math.round(squadStats.expectedPoints)}
+              </span>
             </div>
           </div>
 
           {squad.length > 0 && (
-            <div className="stats-container" style={{ marginBottom: '20px' }}>
-              <h2 style={{ 
-                color: '#37003c',
-                borderBottom: '2px solid #00ff87',
-                paddingBottom: '10px',
-                marginTop: 0
-              }}>
-                Player Stats
-              </h2>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <div className="stat-box" style={{ marginTop: "20px" }}>
+              <h3>Player Stats</h3>
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
                 <thead>
-                  <tr style={{ borderBottom: '1px solid #eee' }}>
-                    <th style={{ textAlign: 'left', padding: '8px 4px' }}>Player</th>
-                    <th style={{ textAlign: 'right', padding: '8px 4px' }}>Pts</th>
-                    <th style={{ textAlign: 'right', padding: '8px 4px' }}>xPts</th>
+                  <tr>
+                    <th style={{ textAlign: "left", padding: "8px 4px" }}>
+                      Player
+                    </th>
+                    <th style={{ textAlign: "right", padding: "8px 4px" }}>
+                      Pts
+                    </th>
+                    <th style={{ textAlign: "right", padding: "8px 4px" }}>
+                      xPts
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {squad.map((player) => (
-                    <tr key={player.id} style={{ borderBottom: '1px solid #eee' }}>
-                      <td style={{ padding: '8px 4px' }}>{getDisplayName(player.name)}</td>
-                      <td style={{ textAlign: 'right', padding: '8px 4px' }}>{player.points}</td>
-                      <td style={{ textAlign: 'right', padding: '8px 4px' }}>{player.xPts.toFixed(0)}</td>
+                    <tr key={player.id}>
+                      <td style={{ padding: "8px 4px" }}>
+                        {getDisplayName(player.name)}
+                      </td>
+                      <td style={{ textAlign: "right", padding: "8px 4px" }}>
+                        {player.stats.points}
+                      </td>
+                      <td style={{ textAlign: "right", padding: "8px 4px" }}>
+                        {Math.round(player.stats.xPts)}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -702,4 +460,4 @@ function SquadBuilder() {
   );
 }
 
-export default SquadBuilder; 
+export default SquadBuilder;

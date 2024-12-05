@@ -28,7 +28,7 @@ function App() {
   }, []);
 
   if (isLoading) {
-    return <div></div>;
+    return <div>Loading FPL data...</div>;
   }
 
   if (error) {
@@ -53,7 +53,7 @@ function App() {
         <Routes>
           <Route path="/" element={<PlayerSearch fplData={fplData} />} />
           <Route path="/stats" element={<LeagueStats fplData={fplData} />} />
-          <Route path="/squad" element={<SquadBuilder />} />
+          <Route path="/squad" element={<SquadBuilder fplData={fplData} />} />
         </Routes>
       </div>
     </Router>
