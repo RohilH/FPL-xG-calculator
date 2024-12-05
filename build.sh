@@ -3,11 +3,9 @@
 # Install Python dependencies
 pip install -r requirements.txt
 
-# Install Node dependencies
+# Install Node.js dependencies and build React app
 npm install
-
-# Build React app
 npm run build
 
-# Start Flask server
-python app.py 
+# Start the app using gunicorn
+gunicorn wsgi:app 
