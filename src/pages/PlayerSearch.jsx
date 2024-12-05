@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
+import { normalizeString } from '../services/fplApi';
+import { formatPlayerStats } from '../services/statsHelper';
+import { Position } from '../enums';
 
-function PlayerSearch() {
+function PlayerSearch({ fplData }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [players, setPlayers] = useState([]);
   const [selectedPlayer, setSelectedPlayer] = useState(null);
@@ -9,8 +12,8 @@ function PlayerSearch() {
 
   useEffect(() => {
     const debounceTimeout = setTimeout(() => {
-      if (searchTerm.length >= 3 && !selectedPlayer) {
-        fetchPlayers();
+      if (searchTerm.length >= 3 && (!selectedPlayer || searchTerm !== selectedPlayer.name)) {
+        searchPlayers();
         setShowDropdown(true);
       } else {
         setPlayers([]);
@@ -21,37 +24,45 @@ function PlayerSearch() {
     return () => clearTimeout(debounceTimeout);
   }, [searchTerm, selectedPlayer]);
 
-  const fetchPlayers = async () => {
-    try {
-      const normalizedSearch = searchTerm
-        .toLowerCase()
-        .normalize('NFKD')
-        .replace(/[\u0300-\u036f]/g, '') // Remove diacritics
-        .replace(/[øØ]/g, 'o')
-        .replace(/[æÆ]/g, 'ae')
-        .replace(/[åÅ]/g, 'a');
+  const searchPlayers = () => {
+    const normalizedSearch = normalizeString(searchTerm);
+    
+    const results = fplData.elements
+      .filter(player => {
+        const playerName = `${player.first_name} ${player.second_name}`;
+        return normalizeString(playerName).includes(normalizedSearch);
+      })
+      .map(player => ({
+        id: player.id,
+        first_name: player.first_name,
+        second_name: player.second_name,
+        name: `${player.first_name} ${player.second_name}`,
+        team: fplData.teams[player.team - 1].name,
+        photo: `https://resources.premierleague.com/premierleague/photos/players/110x140/p${player.code}.png`,
+        position: Position.fromElementType(player.element_type),
+        stats: {
+          points: player.total_points,
+          minutes: player.minutes,
+          goals: player.goals_scored,
+          assists: player.assists,
+          cleanSheets: player.clean_sheets,
+          xG: parseFloat(player.expected_goals || 0),
+          xA: parseFloat(player.expected_assists || 0),
+          form: parseFloat(player.form),
+          selectedBy: parseFloat(player.selected_by_percent),
+          cost: player.now_cost / 10,
+        }
+      }));
 
-      const response = await fetch(`/api/players?search=${encodeURIComponent(normalizedSearch)}`);
-      const data = await response.json();
-      setPlayers(data);
-    } catch (error) {
-      console.error('Error fetching players:', error);
-    }
+    setPlayers(results);
   };
 
-  const handlePlayerSelect = async (player) => {
+  const handlePlayerSelect = (player) => {
     setSelectedPlayer(player);
     setPlayers([]);
     setSearchTerm(player.name);
     setShowDropdown(false);
-    
-    try {
-      const response = await fetch(`/api/player/${player.id}`);
-      const data = await response.json();
-      setStats(data);
-    } catch (error) {
-      console.error('Error fetching player stats:', error);
-    }
+    setStats(formatPlayerStats(player));
   };
 
   const handleInputChange = (e) => {

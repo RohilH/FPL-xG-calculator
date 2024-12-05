@@ -6,7 +6,9 @@ from helpers import (
     calculate_player_xpts,
     get_fpl_data,
     normalize_name,
-    get_player_stats,
+    get_completed_gameweeks,
+    get_player_season_stats,
+    get_player_gameweek_stats,
 )
 
 
@@ -82,7 +84,7 @@ def get_player(player_id):
             return jsonify({"error": "Player not found"}), 404
 
         position = Position.from_element_type(player["element_type"])
-        return jsonify(get_player_stats(player, position))
+        return jsonify(get_player_season_stats(player, position))
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -133,6 +135,54 @@ def get_position_players():
     paginated_players = players[start_idx:end_idx]
 
     return jsonify({"players": paginated_players, "has_more": end_idx < len(players)})
+
+
+@app.route("/api/gameweeks")
+def get_gameweeks():
+    """Get list of completed gameweeks"""
+    completed = get_completed_gameweeks()
+    return jsonify(
+        {"gameweeks": [{"id": "season", "name": "Entire Season"}, *completed]}
+    )
+
+
+@app.route("/api/players/stats", methods=["POST"])
+def get_players_stats():
+    """Get stats for multiple players, optionally for a specific gameweek"""
+    data = request.get_json()
+    if not data or "players" not in data:
+        return jsonify({"error": "Players list is required"}), 400
+
+    gameweek = data.get("gameweek")
+    players = data["players"]
+    fpl_data = get_fpl_data()
+
+    result = {}
+    for player_id in players:
+        # Get player data from bootstrap-static
+        player = next((p for p in fpl_data["elements"] if p["id"] == player_id), None)
+        if not player:
+            continue
+
+        position = Position.from_element_type(player["element_type"])
+
+        if gameweek == "season" or not gameweek:
+            result[player_id] = get_player_season_stats(player, position)
+        else:
+            gw_stats = get_player_gameweek_stats(player_id, gameweek, position)
+            if gw_stats:
+                result[player_id] = gw_stats
+
+    return jsonify(result)
+
+
+@app.route("/api/fpl-data")
+def get_raw_fpl_data():
+    try:
+        data = get_fpl_data()
+        return jsonify(data)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 # Serve React App
