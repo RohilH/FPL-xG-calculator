@@ -1,8 +1,8 @@
+import os
 from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 import requests
 from enum import Enum
-import os
 from helpers import normalize_name
 
 
@@ -31,8 +31,23 @@ class Position(Enum):
             raise ValueError(f"Invalid element_type: {element_type}")
 
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder="static", static_url_path="/static")
 CORS(app)
+
+
+# Serve static files
+@app.route("/static/<path:path>")
+def serve_static(path):
+    return send_from_directory("static", path)
+
+
+# Serve our single page app for all routes
+@app.route("/", defaults={"path": ""})
+def serve_app(path):
+    # if path.startswith("api/"):
+    #     return {"error": "Not found"}, 404
+    return send_from_directory("static", "index.html")
+
 
 FPL_API_URL = "https://fantasy.premierleague.com/api"
 
@@ -94,21 +109,6 @@ def calculate_player_xpts(player, position: Position):
         + appearance_points
         + bonus_and_deductions
     )
-
-
-@app.route("/")
-def index():
-    return send_from_directory(".", "index.html")
-
-
-@app.route("/stats")
-def stats():
-    return send_from_directory(".", "stats.html")
-
-
-@app.route("/squad")
-def squad():
-    return send_from_directory(".", "squad.html")
 
 
 @app.route("/api/players", methods=["GET"])

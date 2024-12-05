@@ -1,0 +1,24 @@
+{
+  "name": "xgcalculator",
+  "version": "1.0.0",
+  "description": "FPL xG Calculator",
+  "type": "module",
+  "scripts": {
+    "build": "npm run clean && tsc && npm run copy-files",
+    "watch": "concurrently \"tsc -w\" \"npm run watch-css\"",
+    "copy-files": "npm run copy-css && npm run copy-html",
+    "copy-css": "copyfiles -f \"src/styles/*.css\" static/styles",
+    "copy-html": "copyfiles -f static/index.html static",
+    "watch-css": "onchange \"src/styles/*.css\" -- npm run copy-css",
+    "clean": "rimraf static/js static/styles",
+    "dev": "concurrently \"npm run watch\" \"python app.py\""
+  },
+  "devDependencies": {
+    "@types/node": "^20.17.9",
+    "concurrently": "^9.1.0",
+    "copyfiles": "^2.4.1",
+    "onchange": "^7.1.0",
+    "rimraf": "^5.0.5",
+    "typescript": "^5.0.0"
+  }
+}
