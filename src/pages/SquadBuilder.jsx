@@ -1,16 +1,21 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 
 function SquadBuilder() {
   const [squad, setSquad] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [activeSearch, setActiveSearch] = useState(null);
-  const [allPositionPlayers, setAllPositionPlayers] = useState([]);
-  const [playerCache, setPlayerCache] = useState({});
+  const [currentPage, setCurrentPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const [isFetching, setIsFetching] = useState(false);
   const [squadStats, setSquadStats] = useState({
     totalPoints: 0,
     expectedPoints: 0
   });
+
+  const searchListRef = useRef(null);
+  const lastScrollTime = useRef(0);
 
   const resetSquad = () => {
     setSquad([]);
@@ -37,55 +42,70 @@ function SquadBuilder() {
 
   useEffect(() => {
     if (activeSearch) {
-      fetchPositionPlayers();
+      setCurrentPage(1);
+      setHasMore(true);
+      setIsInitialLoad(true);
+      setSearchResults([]);
+      fetchPositionPlayers(1, true);
     } else {
       setSearchResults([]);
-      setAllPositionPlayers([]);
       setSearchTerm('');
+      setCurrentPage(1);
+      setHasMore(true);
+      setIsInitialLoad(true);
     }
   }, [activeSearch]);
 
   useEffect(() => {
-    if (activeSearch && allPositionPlayers.length > 0) {
-      const availablePlayers = allPositionPlayers.filter(
-        player => !squad.some(squadPlayer => squadPlayer.id === player.id)
-      );
-      
-      const filtered = availablePlayers.filter(player => {
-        const fullName = `${player.name}`.toLowerCase();
-        return fullName.includes(searchTerm.toLowerCase());
-      });
-      setSearchResults(filtered);
-    }
-  }, [searchTerm, allPositionPlayers, squad]);
+    if (activeSearch) {
+      const debounceTimeout = setTimeout(() => {
+        setCurrentPage(1);
+        setSearchResults([]);
+        setHasMore(true);
+        fetchPositionPlayers(1, true);
+      }, 300);
 
-  const fetchPositionPlayers = async (searchPosition) => {
-    const position = searchPosition || activeSearch.position;
+      return () => clearTimeout(debounceTimeout);
+    }
+  }, [searchTerm]);
+
+  const handleScroll = useCallback((e) => {
+    const now = Date.now();
+    if (now - lastScrollTime.current < 100) return; // Throttle to max one request per 100ms
     
-    // Check cache first
-    if (playerCache[position]) {
-      setAllPositionPlayers(playerCache[position]);
-      setSearchResults(playerCache[position]);
-      return;
+    const bottom = e.target.scrollHeight - e.target.scrollTop <= e.target.clientHeight + 100;
+    if (bottom && hasMore && !isInitialLoad && !isFetching) {
+      lastScrollTime.current = now;
+      fetchPositionPlayers(currentPage + 1);
     }
+  }, [currentPage, hasMore, isInitialLoad, isFetching]);
 
+  const fetchPositionPlayers = async (page, isNewSearch = false) => {
+    if (!activeSearch || (!hasMore && !isNewSearch) || (isFetching && !isNewSearch)) return;
+    
+    setIsFetching(true);
     try {
-      const response = await fetch('/api/league-stats');
+      const params = new URLSearchParams({
+        position: activeSearch.position,
+        page: page,
+        per_page: 10
+      });
+      
+      if (searchTerm) {
+        params.append('search', searchTerm);
+      }
+
+      const response = await fetch(`/api/position-players?${params}`);
       const data = await response.json();
-      const positionPlayers = data
-        .filter(player => player.position === position)
-        .sort((a, b) => b.points - a.points);
       
-      // Update cache
-      setPlayerCache(prev => ({
-        ...prev,
-        [position]: positionPlayers
-      }));
-      
-      setAllPositionPlayers(positionPlayers);
-      setSearchResults(positionPlayers);
+      setSearchResults(prev => isNewSearch ? data.players : [...prev, ...data.players]);
+      setHasMore(data.has_more);
+      setCurrentPage(page);
+      setIsInitialLoad(false);
     } catch (error) {
       console.error('Error fetching players:', error);
+    } finally {
+      setIsFetching(false);
     }
   };
 
@@ -288,10 +308,9 @@ function SquadBuilder() {
 
     // If we get here, it's safe to search
     setSearchResults([]);
-    setAllPositionPlayers([]);
     setSearchTerm('');
     setActiveSearch({ position, index });
-    fetchPositionPlayers(position);
+    fetchPositionPlayers();
   };
 
   const renderPitch = () => {
@@ -457,7 +476,7 @@ function SquadBuilder() {
         ))}
 
         {/* Position-specific search overlay */}
-        {activeSearch && (
+        {activeSearch && !isInitialLoad && (
           <div style={{
             position: 'absolute',
             top: '50%',
@@ -508,16 +527,21 @@ function SquadBuilder() {
               </button>
             </div>
 
-            <ul className="player-list" style={{ 
-              maxHeight: '400px',
-              overflowY: 'auto',
-              position: 'static',
-              marginTop: '12px',
-              padding: 0,
-              listStyle: 'none',
-              border: '1px solid #eee',
-              borderRadius: '8px'
-            }}>
+            <ul 
+              className="player-list" 
+              ref={searchListRef}
+              onScroll={handleScroll}
+              style={{ 
+                maxHeight: '400px',
+                overflowY: 'auto',
+                position: 'static',
+                marginTop: '12px',
+                padding: 0,
+                listStyle: 'none',
+                border: '1px solid #eee',
+                borderRadius: '8px'
+              }}
+            >
               {searchResults.map((player) => (
                 <li 
                   key={player.id} 

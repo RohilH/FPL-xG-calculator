@@ -88,6 +88,53 @@ def get_player(player_id):
         return jsonify({"error": str(e)}), 500
 
 
+@app.route("/api/position-players")
+def get_position_players():
+    position = request.args.get("position")
+    search = request.args.get("search", "").lower()
+    page = int(request.args.get("page", 1))
+    per_page = int(request.args.get("per_page", 10))
+
+    if not position:
+        return jsonify({"error": "Position is required"}), 400
+
+    fpl_data = get_fpl_data()
+    players = []
+
+    for player in fpl_data["elements"]:
+        player_position = Position.from_element_type(player["element_type"]).name
+        if player_position != position:
+            continue
+
+        player_name = f"{player['first_name']} {player['second_name']}"
+        if search and search not in player_name.lower():
+            continue
+
+        players.append(
+            {
+                "id": player["id"],
+                "name": player_name,
+                "team": fpl_data["teams"][player["team"] - 1]["name"],
+                "position": player_position,
+                "photo": f"https://resources.premierleague.com/premierleague/photos/players/110x140/p{player['code']}.png",
+                "points": player["total_points"],
+                "xPts": calculate_player_xpts(
+                    player, Position.from_element_type(player["element_type"])
+                ),
+            }
+        )
+
+    # Sort by points
+    players.sort(key=lambda x: x["points"], reverse=True)
+
+    # Calculate pagination
+    start_idx = (page - 1) * per_page
+    end_idx = start_idx + per_page
+    paginated_players = players[start_idx:end_idx]
+
+    return jsonify({"players": paginated_players, "has_more": end_idx < len(players)})
+
+
 # Serve React App
 @app.route("/", defaults={"path": ""})
 @app.route("/<path:path>")
