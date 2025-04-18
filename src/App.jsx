@@ -8,6 +8,7 @@ import {
 import PlayerSearch from "./pages/PlayerSearch";
 import LeagueStats from "./pages/LeagueStats";
 import SquadBuilder from "./pages/SquadBuilder";
+import DraftAnalysis from "./pages/DraftAnalysis";
 import { getFplData } from "./services/fplApi";
 import "./styles/App.css";
 
@@ -62,12 +63,19 @@ function App() {
           >
             Squad Builder
           </NavLink>
+          <NavLink
+            to="/draft"
+            className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`}
+          >
+            Draft Analysis
+          </NavLink>
         </nav>
 
         <Routes>
           <Route path="/" element={<PlayerSearch fplData={fplData} />} />
           <Route path="/stats" element={<LeagueStats fplData={fplData} />} />
           <Route path="/squad" element={<SquadBuilder fplData={fplData} />} />
+          <Route path="/draft" element={<DraftAnalysis fplData={fplData} />} />
         </Routes>
       </div>
     </Router>
